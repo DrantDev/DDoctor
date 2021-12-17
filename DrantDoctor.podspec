@@ -20,13 +20,16 @@ Pod::Spec.new do |s|
    
   s.vendored_frameworks =  'DrantDoctor/*.framework'
   
-  s.frameworks = 'SystemConfiguration', 'AVFoundation', 'Accelerate'
-  s.libraries    =  'c++','resolv'
+  s.frameworks = 'SystemConfiguration', 'MobileCoreServices', 'AVFoundation', 'CoreTelephony', 'VideoToolbox', 'AudioToolbox', 'CoreMedia'
+  s.libraries    =  'z', 'sqlite3.0', 'c++', 'resolv.9'
   
   s.ios.deployment_target = '9.0'
   
   s.pod_target_xcconfig = {
     'OTHER_LDFLAGS' => '-ObjC',
     'ENABLE_BITCODE' => 'NO',
- }
+  }
+
+  s.dependency 'TXIMSDK_iOS'
+
 end
