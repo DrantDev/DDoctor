@@ -1,0 +1,11 @@
+framework module DDoctorSDK {
+  umbrella header "DDoctorSDK-umbrella.h"
+
+  export *
+  module * { export * }
+}
+
+module DDoctorSDK.Swift {
+    header "DDoctorSDK-Swift.h"
+    requires objc
+}

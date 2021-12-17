@@ -1,0 +1,3641 @@
+// swift-interface-format-version: 1.0
+// swift-compiler-version: Apple Swift version 5.4.2 (swiftlang-1205.0.28.2 clang-1205.0.19.57)
+// swift-module-flags: -target arm64-apple-ios9.0 -enable-objc-interop -enable-library-evolution -swift-version 5 -enforce-exclusivity=checked -O -module-name DDoctorSDK
+import AVFoundation
+import AdSupport
+import CoreGraphics
+import CoreLocation
+import CoreTelephony
+@_exported import DDoctorSDK
+import Darwin
+import Dispatch
+import Foundation
+import ImSDK
+import LocalAuthentication
+import MobileCoreServices
+import ObjectiveC
+import Photos
+import Security
+import SecurityKit
+import Swift
+import SystemConfiguration
+import TXLiteAVSDK_Professional
+import UIKit
+public protocol AEAD {
+  static var kLen: Swift.Int { get }
+  static var ivRange: Swift.Range<Swift.Int> { get }
+}
+@_hasMissingDesignatedInitializers final public class AEADChaCha20Poly1305 : DDoctorSDK.AEAD {
+  public static let kLen: Swift.Int
+  public static var ivRange: Swift.Range<Swift.Int>
+  public static func encrypt(_ plainText: Swift.Array<Swift.UInt8>, key: Swift.Array<Swift.UInt8>, iv: Swift.Array<Swift.UInt8>, authenticationHeader: Swift.Array<Swift.UInt8>) throws -> (cipherText: Swift.Array<Swift.UInt8>, authenticationTag: Swift.Array<Swift.UInt8>)
+  public static func decrypt(_ cipherText: Swift.Array<Swift.UInt8>, key: Swift.Array<Swift.UInt8>, iv: Swift.Array<Swift.UInt8>, authenticationHeader: Swift.Array<Swift.UInt8>, authenticationTag: Swift.Array<Swift.UInt8>) throws -> (plainText: Swift.Array<Swift.UInt8>, success: Swift.Bool)
+  @objc deinit
+}
+extension AES {
+  convenience public init(key: Swift.String, iv: Swift.String, padding: DDoctorSDK.Padding = .pkcs7) throws
+}
+extension AES : DDoctorSDK.Cryptors {
+  @inlinable final public func makeEncryptor() throws -> DDoctorSDK.Cryptor & DDoctorSDK.Updatable {
+    let blockSize = blockMode.customBlockSize ?? AES.blockSize
+    let worker = try blockMode.worker(blockSize: blockSize, cipherOperation: encrypt, encryptionOperation: encrypt)
+    if worker is StreamModeWorker {
+      return try StreamEncryptor(blockSize: blockSize, padding: padding, worker)
+    }
+    return try BlockEncryptor(blockSize: blockSize, padding: padding, worker)
+  }
+  @inlinable final public func makeDecryptor() throws -> DDoctorSDK.Cryptor & DDoctorSDK.Updatable {
+    let blockSize = blockMode.customBlockSize ?? AES.blockSize
+    let cipherOperation: CipherOperationOnBlock = blockMode.options.contains(.useEncryptToDecrypt) == true ? encrypt : decrypt
+    let worker = try blockMode.worker(blockSize: blockSize, cipherOperation: cipherOperation, encryptionOperation: encrypt)
+    if worker is StreamModeWorker {
+      return try StreamDecryptor(blockSize: blockSize, padding: padding, worker)
+    }
+    return try BlockDecryptor(blockSize: blockSize, padding: padding, worker)
+  }
+}
+final public class AES {
+  public enum Error : Swift.Error {
+    case invalidKeySize
+    case dataPaddingRequired
+    case invalidData
+    public static func == (a: DDoctorSDK.AES.Error, b: DDoctorSDK.AES.Error) -> Swift.Bool
+    public func hash(into hasher: inout Swift.Hasher)
+    public var hashValue: Swift.Int {
+      get
+    }
+  }
+  public enum Variant : Swift.Int {
+    case aes128, aes192, aes256
+    public init?(rawValue: Swift.Int)
+    public typealias RawValue = Swift.Int
+    public var rawValue: Swift.Int {
+      get
+    }
+  }
+  @usableFromInline
+  final internal let variantNr: Swift.Int
+  @usableFromInline
+  final internal let variantNb: Swift.Int
+  @usableFromInline
+  final internal let variantNk: Swift.Int
+  public static let blockSize: Swift.Int
+  final public let keySize: Swift.Int
+  final public let variant: DDoctorSDK.AES.Variant
+  @usableFromInline
+  final internal let blockMode: DDoctorSDK.BlockMode
+  @usableFromInline
+  final internal let padding: DDoctorSDK.Padding
+  @usableFromInline
+  final internal var expandedKey: Swift.Array<Swift.Array<Swift.UInt32>> {
+    get
+    set
+  }
+  @usableFromInline
+  final internal var expandedKeyInv: Swift.Array<Swift.Array<Swift.UInt32>> {
+    get
+    set
+  }
+  @usableFromInline
+  internal static let T0: [Swift.UInt32]
+  @usableFromInline
+  internal static let T0_INV: [Swift.UInt32]
+  @usableFromInline
+  internal static let T1: [Swift.UInt32]
+  @usableFromInline
+  internal static let T1_INV: [Swift.UInt32]
+  @usableFromInline
+  internal static let T2: [Swift.UInt32]
+  @usableFromInline
+  internal static let T2_INV: [Swift.UInt32]
+  @usableFromInline
+  internal static let T3: [Swift.UInt32]
+  @usableFromInline
+  internal static let T3_INV: [Swift.UInt32]
+  @usableFromInline
+  internal static let U1: [Swift.UInt32]
+  @usableFromInline
+  internal static let U2: [Swift.UInt32]
+  @usableFromInline
+  internal static let U3: [Swift.UInt32]
+  @usableFromInline
+  internal static let U4: [Swift.UInt32]
+  public init(key: Swift.Array<Swift.UInt8>, blockMode: DDoctorSDK.BlockMode, padding: DDoctorSDK.Padding = .pkcs7) throws
+  @inlinable final internal func encrypt(block: Swift.ArraySlice<Swift.UInt8>) -> Swift.Array<Swift.UInt8>? {
+    if self.blockMode.options.contains(.paddingRequired) && block.count != AES.blockSize {
+      return Array(block)
+    }
+
+    let rounds = self.variantNr
+    let rk = self.expandedKey
+
+    let b00 = UInt32(block[block.startIndex.advanced(by: 0)])
+    let b01 = UInt32(block[block.startIndex.advanced(by: 1)]) << 8
+    let b02 = UInt32(block[block.startIndex.advanced(by: 2)]) << 16
+    let b03 = UInt32(block[block.startIndex.advanced(by: 3)]) << 24
+    var b0 = b00 | b01 | b02 | b03
+
+    let b10 = UInt32(block[block.startIndex.advanced(by: 4)])
+    let b11 = UInt32(block[block.startIndex.advanced(by: 5)]) << 8
+    let b12 = UInt32(block[block.startIndex.advanced(by: 6)]) << 16
+    let b13 = UInt32(block[block.startIndex.advanced(by: 7)]) << 24
+    var b1 = b10 | b11 | b12 | b13
+
+    let b20 = UInt32(block[block.startIndex.advanced(by: 8)])
+    let b21 = UInt32(block[block.startIndex.advanced(by: 9)]) << 8
+    let b22 = UInt32(block[block.startIndex.advanced(by: 10)]) << 16
+    let b23 = UInt32(block[block.startIndex.advanced(by: 11)]) << 24
+    var b2 = b20 | b21 | b22 | b23
+
+    let b30 = UInt32(block[block.startIndex.advanced(by: 12)])
+    let b31 = UInt32(block[block.startIndex.advanced(by: 13)]) << 8
+    let b32 = UInt32(block[block.startIndex.advanced(by: 14)]) << 16
+    let b33 = UInt32(block[block.startIndex.advanced(by: 15)]) << 24
+    var b3 = b30 | b31 | b32 | b33
+
+    let tLength = 4
+    let t = UnsafeMutablePointer<UInt32>.allocate(capacity: tLength)
+    t.initialize(repeating: 0, count: tLength)
+    defer {
+      t.deinitialize(count: tLength)
+      t.deallocate()
+    }
+
+    for r in 0..<rounds - 1 {
+      t[0] = b0 ^ rk[r][0]
+      t[1] = b1 ^ rk[r][1]
+      t[2] = b2 ^ rk[r][2]
+      t[3] = b3 ^ rk[r][3]
+
+      let lb00 = AES.T0[Int(t[0] & 0xff)]
+      let lb01 = AES.T1[Int((t[1] >> 8) & 0xff)]
+      let lb02 = AES.T2[Int((t[2] >> 16) & 0xff)]
+      let lb03 = AES.T3[Int(t[3] >> 24)]
+      b0 = lb00 ^ lb01 ^ lb02 ^ lb03
+
+      let lb10 = AES.T0[Int(t[1] & 0xff)]
+      let lb11 = AES.T1[Int((t[2] >> 8) & 0xff)]
+      let lb12 = AES.T2[Int((t[3] >> 16) & 0xff)]
+      let lb13 = AES.T3[Int(t[0] >> 24)]
+      b1 = lb10 ^ lb11 ^ lb12 ^ lb13
+
+      let lb20 = AES.T0[Int(t[2] & 0xff)]
+      let lb21 = AES.T1[Int((t[3] >> 8) & 0xff)]
+      let lb22 = AES.T2[Int((t[0] >> 16) & 0xff)]
+      let lb23 = AES.T3[Int(t[1] >> 24)]
+      b2 = lb20 ^ lb21 ^ lb22 ^ lb23
+
+      let lb30 = AES.T0[Int(t[3] & 0xff)]
+      let lb31 = AES.T1[Int((t[0] >> 8) & 0xff)]
+      let lb32 = AES.T2[Int((t[1] >> 16) & 0xff)]
+      let lb33 = AES.T3[Int(t[2] >> 24)]
+      b3 = lb30 ^ lb31 ^ lb32 ^ lb33
+    }
+
+    // last round
+    let r = rounds - 1
+
+    t[0] = b0 ^ rk[r][0]
+    t[1] = b1 ^ rk[r][1]
+    t[2] = b2 ^ rk[r][2]
+    t[3] = b3 ^ rk[r][3]
+
+    // rounds
+    b0 = F1(t[0], t[1], t[2], t[3]) ^ rk[rounds][0]
+    b1 = F1(t[1], t[2], t[3], t[0]) ^ rk[rounds][1]
+    b2 = F1(t[2], t[3], t[0], t[1]) ^ rk[rounds][2]
+    b3 = F1(t[3], t[0], t[1], t[2]) ^ rk[rounds][3]
+
+    let encrypted: Array<UInt8> = [
+      UInt8(b0 & 0xff), UInt8((b0 >> 8) & 0xff), UInt8((b0 >> 16) & 0xff), UInt8((b0 >> 24) & 0xff),
+      UInt8(b1 & 0xff), UInt8((b1 >> 8) & 0xff), UInt8((b1 >> 16) & 0xff), UInt8((b1 >> 24) & 0xff),
+      UInt8(b2 & 0xff), UInt8((b2 >> 8) & 0xff), UInt8((b2 >> 16) & 0xff), UInt8((b2 >> 24) & 0xff),
+      UInt8(b3 & 0xff), UInt8((b3 >> 8) & 0xff), UInt8((b3 >> 16) & 0xff), UInt8((b3 >> 24) & 0xff)
+    ]
+    return encrypted
+  }
+  @usableFromInline
+  final internal func decrypt(block: Swift.ArraySlice<Swift.UInt8>) -> Swift.Array<Swift.UInt8>?
+  @objc deinit
+}
+extension AES {
+  @usableFromInline
+  @inline(__always) final internal func F1(_ x0: Swift.UInt32, _ x1: Swift.UInt32, _ x2: Swift.UInt32, _ x3: Swift.UInt32) -> Swift.UInt32
+}
+extension AES : DDoctorSDK.Cipher {
+  @inlinable final public func encrypt(_ bytes: Swift.ArraySlice<Swift.UInt8>) throws -> Swift.Array<Swift.UInt8> {
+    let blockSize = self.blockMode.customBlockSize ?? AES.blockSize
+    let chunks = bytes.batched(by: blockSize)
+
+    var oneTimeCryptor = try makeEncryptor()
+    var out = Array<UInt8>(reserveCapacity: bytes.count)
+    for chunk in chunks {
+      out += try oneTimeCryptor.update(withBytes: chunk, isLast: false)
+    }
+    // Padding may be added at the very end
+    out += try oneTimeCryptor.finish()
+
+    if self.blockMode.options.contains(.paddingRequired) && (out.count % AES.blockSize != 0) {
+      throw Error.dataPaddingRequired
+    }
+
+    return out
+  }
+  @inlinable final public func decrypt(_ bytes: Swift.ArraySlice<Swift.UInt8>) throws -> Swift.Array<Swift.UInt8> {
+    if self.blockMode.options.contains(.paddingRequired) && (bytes.count % AES.blockSize != 0) {
+      throw Error.dataPaddingRequired
+    }
+
+    var oneTimeCryptor = try makeDecryptor()
+    let chunks = bytes.batched(by: AES.blockSize)
+    if chunks.isEmpty {
+      throw Error.invalidData
+    }
+
+    var out = Array<UInt8>(reserveCapacity: bytes.count)
+
+    var lastIdx = chunks.startIndex
+    chunks.indices.formIndex(&lastIdx, offsetBy: chunks.count - 1)
+
+    // To properly remove padding, `isLast` has to be known when called with the last chunk of ciphertext
+    // Last chunk of ciphertext may contains padded data so next call to update(..) won't be able to remove it
+    for idx in chunks.indices {
+      out += try oneTimeCryptor.update(withBytes: chunks[idx], isLast: idx == lastIdx)
+    }
+    return out
+  }
+}
+extension Array {
+  @inlinable internal init(reserveCapacity: Swift.Int) {
+    self = Array<Element>()
+    self.reserveCapacity(reserveCapacity)
+  }
+  @inlinable internal var slice: Swift.ArraySlice<Element> {
+    get {
+    self[self.startIndex ..< self.endIndex]
+  }
+  }
+}
+extension Array where Element == Swift.UInt8 {
+  public init(hex: Swift.String)
+  public func toHexString() -> Swift.String
+}
+extension Array where Element == Swift.UInt8 {
+  @available(*, deprecated)
+  public func chunks(size chunksize: Swift.Int) -> Swift.Array<Swift.Array<Element>>
+  public func md5() -> [Element]
+  public func sha1() -> [Element]
+  public func sha224() -> [Element]
+  public func sha256() -> [Element]
+  public func sha384() -> [Element]
+  public func sha512() -> [Element]
+  public func sha2(_ variant: DDoctorSDK.SHA2.Variant) -> [Element]
+  public func sha3(_ variant: DDoctorSDK.SHA3.Variant) -> [Element]
+  public func crc32(seed: Swift.UInt32? = nil, reflect: Swift.Bool = true) -> Swift.UInt32
+  public func crc32c(seed: Swift.UInt32? = nil, reflect: Swift.Bool = true) -> Swift.UInt32
+  public func crc16(seed: Swift.UInt16? = nil) -> Swift.UInt16
+  public func encrypt(cipher: DDoctorSDK.Cipher) throws -> [Element]
+  public func decrypt(cipher: DDoctorSDK.Cipher) throws -> [Element]
+  public func authenticate<A>(with authenticator: A) throws -> [Element] where A : DDoctorSDK.Authenticator
+}
+extension Array where Element == Swift.UInt8 {
+  public func toBase64() -> Swift.String?
+  public init(base64: Swift.String)
+}
+public protocol Authenticator {
+  func authenticate(_ bytes: Swift.Array<Swift.UInt8>) throws -> Swift.Array<Swift.UInt8>
+}
+@usableFromInline
+internal struct BatchedCollectionIndex<Base> where Base : Swift.Collection {
+}
+extension BatchedCollectionIndex : Swift.Comparable {
+  @usableFromInline
+  internal static func == <Base>(lhs: DDoctorSDK.BatchedCollectionIndex<Base>, rhs: DDoctorSDK.BatchedCollectionIndex<Base>) -> Swift.Bool where Base : Swift.Collection
+  @usableFromInline
+  internal static func < <Base>(lhs: DDoctorSDK.BatchedCollectionIndex<Base>, rhs: DDoctorSDK.BatchedCollectionIndex<Base>) -> Swift.Bool where Base : Swift.Collection
+}
+@usableFromInline
+internal struct BatchedCollection<Base> : Swift.Collection where Base : Swift.Collection {
+  @usableFromInline
+  internal init(base: Base, size: Swift.Int)
+  @usableFromInline
+  internal typealias Index = DDoctorSDK.BatchedCollectionIndex<Base>
+  @usableFromInline
+  internal var startIndex: DDoctorSDK.BatchedCollection<Base>.Index {
+    get
+  }
+  @usableFromInline
+  internal var endIndex: DDoctorSDK.BatchedCollection<Base>.Index {
+    get
+  }
+  @usableFromInline
+  internal func index(after idx: DDoctorSDK.BatchedCollection<Base>.Index) -> DDoctorSDK.BatchedCollection<Base>.Index
+  @usableFromInline
+  internal subscript(idx: DDoctorSDK.BatchedCollection<Base>.Index) -> Base.SubSequence {
+    get
+  }
+  @usableFromInline
+  internal typealias Element = Base.SubSequence
+  @usableFromInline
+  internal typealias Indices = Swift.DefaultIndices<DDoctorSDK.BatchedCollection<Base>>
+  @usableFromInline
+  internal typealias Iterator = Swift.IndexingIterator<DDoctorSDK.BatchedCollection<Base>>
+  @usableFromInline
+  internal typealias SubSequence = Swift.Slice<DDoctorSDK.BatchedCollection<Base>>
+}
+extension Collection {
+  @inlinable internal func batched(by size: Swift.Int) -> DDoctorSDK.BatchedCollection<Self> {
+    BatchedCollection(base: self, size: size)
+  }
+}
+public enum Bit : Swift.Int {
+  case zero
+  case one
+  public init?(rawValue: Swift.Int)
+  public typealias RawValue = Swift.Int
+  public var rawValue: Swift.Int {
+    get
+  }
+}
+extension Bit {
+  @inlinable internal func inverted() -> DDoctorSDK.Bit {
+    self == .zero ? .one : .zero
+  }
+}
+public class BlockDecryptor : DDoctorSDK.Cryptor, DDoctorSDK.Updatable {
+  @usableFromInline
+  final internal let blockSize: Swift.Int
+  @usableFromInline
+  final internal let padding: DDoctorSDK.Padding
+  @usableFromInline
+  internal var worker: DDoctorSDK.CipherModeWorker
+  @usableFromInline
+  internal var accumulated: [Swift.UInt8]
+  @usableFromInline
+  internal init(blockSize: Swift.Int, padding: DDoctorSDK.Padding, _ worker: DDoctorSDK.CipherModeWorker) throws
+  @inlinable public func update(withBytes bytes: Swift.ArraySlice<Swift.UInt8>, isLast: Swift.Bool = false) throws -> Swift.Array<Swift.UInt8> {
+    self.accumulated += bytes
+
+    // If a worker (eg GCM) can combine ciphertext + tag
+    // we need to remove tag from the ciphertext.
+    if !isLast && self.accumulated.count < self.blockSize + self.worker.additionalBufferSize {
+      return []
+    }
+
+    let accumulatedWithoutSuffix: Array<UInt8>
+    if self.worker.additionalBufferSize > 0 {
+      // FIXME: how slow is that?
+      accumulatedWithoutSuffix = Array(self.accumulated.prefix(self.accumulated.count - self.worker.additionalBufferSize))
+    } else {
+      accumulatedWithoutSuffix = self.accumulated
+    }
+
+    var processedBytesCount = 0
+    var plaintext = Array<UInt8>(reserveCapacity: accumulatedWithoutSuffix.count)
+    // Processing in a block-size manner. It's good for block modes, but bad for stream modes.
+    for var chunk in accumulatedWithoutSuffix.batched(by: self.blockSize) {
+      if isLast || (accumulatedWithoutSuffix.count - processedBytesCount) >= blockSize {
+        let isLastChunk = processedBytesCount + chunk.count == accumulatedWithoutSuffix.count
+
+        if isLast, isLastChunk, var finalizingWorker = worker as? FinalizingDecryptModeWorker {
+          chunk = try finalizingWorker.willDecryptLast(bytes: chunk + accumulated.suffix(worker.additionalBufferSize)) // tag size
+        }
+
+        if !chunk.isEmpty {
+          plaintext += worker.decrypt(block: chunk)
+        }
+
+        if isLast, isLastChunk, var finalizingWorker = worker as? FinalizingDecryptModeWorker {
+          plaintext = Array(try finalizingWorker.didDecryptLast(bytes: plaintext.slice))
+        }
+
+        processedBytesCount += chunk.count
+      }
+    }
+    accumulated.removeFirst(processedBytesCount) // super-slow
+
+    if isLast {
+      if accumulatedWithoutSuffix.isEmpty, var finalizingWorker = worker as? FinalizingDecryptModeWorker {
+        try finalizingWorker.willDecryptLast(bytes: self.accumulated.suffix(self.worker.additionalBufferSize))
+        plaintext = Array(try finalizingWorker.didDecryptLast(bytes: plaintext.slice))
+      }
+      plaintext = self.padding.remove(from: plaintext, blockSize: self.blockSize)
+    }
+
+    return plaintext
+  }
+  public func seek(to position: Swift.Int) throws
+  @objc deinit
+}
+@usableFromInline
+final internal class BlockEncryptor : DDoctorSDK.Cryptor, DDoctorSDK.Updatable {
+  @usableFromInline
+  internal init(blockSize: Swift.Int, padding: DDoctorSDK.Padding, _ worker: DDoctorSDK.CipherModeWorker) throws
+  final public func update(withBytes bytes: Swift.ArraySlice<Swift.UInt8>, isLast: Swift.Bool) throws -> Swift.Array<Swift.UInt8>
+  @usableFromInline
+  final internal func seek(to: Swift.Int) throws
+  @objc @usableFromInline
+  deinit
+}
+public typealias CipherOperationOnBlock = (Swift.ArraySlice<Swift.UInt8>) -> Swift.Array<Swift.UInt8>?
+public protocol BlockMode {
+  var options: DDoctorSDK.BlockModeOption { get }
+  @inlinable func worker(blockSize: Swift.Int, cipherOperation: @escaping DDoctorSDK.CipherOperationOnBlock, encryptionOperation: @escaping DDoctorSDK.CipherOperationOnBlock) throws -> DDoctorSDK.CipherModeWorker
+  var customBlockSize: Swift.Int? { get }
+}
+public struct BlockModeOption : Swift.OptionSet {
+  public let rawValue: Swift.Int
+  public init(rawValue: Swift.Int)
+  @usableFromInline
+  internal static let none: DDoctorSDK.BlockModeOption
+  @usableFromInline
+  internal static let initializationVectorRequired: DDoctorSDK.BlockModeOption
+  @usableFromInline
+  internal static let paddingRequired: DDoctorSDK.BlockModeOption
+  @usableFromInline
+  internal static let useEncryptToDecrypt: DDoctorSDK.BlockModeOption
+  public typealias ArrayLiteralElement = DDoctorSDK.BlockModeOption
+  public typealias Element = DDoctorSDK.BlockModeOption
+  public typealias RawValue = Swift.Int
+}
+extension Blowfish {
+  convenience public init(key: Swift.String, iv: Swift.String, padding: DDoctorSDK.Padding = .pkcs7) throws
+}
+final public class Blowfish {
+  public enum Error : Swift.Error {
+    case dataPaddingRequired
+    case invalidKeyOrInitializationVector
+    case invalidInitializationVector
+    case invalidBlockMode
+    public static func == (a: DDoctorSDK.Blowfish.Error, b: DDoctorSDK.Blowfish.Error) -> Swift.Bool
+    public func hash(into hasher: inout Swift.Hasher)
+    public var hashValue: Swift.Int {
+      get
+    }
+  }
+  public static let blockSize: Swift.Int
+  final public let keySize: Swift.Int
+  public init(key: Swift.Array<Swift.UInt8>, blockMode: DDoctorSDK.BlockMode = CBC(iv: Array<UInt8>(repeating: 0, count: Blowfish.blockSize)), padding: DDoctorSDK.Padding) throws
+  @objc deinit
+}
+extension Blowfish : DDoctorSDK.Cipher {
+  final public func encrypt<C>(_ bytes: C) throws -> Swift.Array<Swift.UInt8> where C : Swift.Collection, C.Element == Swift.UInt8, C.Index == Swift.Int
+  final public func decrypt<C>(_ bytes: C) throws -> Swift.Array<Swift.UInt8> where C : Swift.Collection, C.Element == Swift.UInt8, C.Index == Swift.Int
+}
+@_hasMissingDesignatedInitializers public class BusyPics {
+  public static let `default`: DDoctorSDK.BusyPics
+  public func cacheImgs()
+  public func getImgs() -> [Foundation.URL?]
+  @objc deinit
+}
+public struct CallDoctorModel : DDoctorSDK.Mappable {
+  public var realPatientUuid: Swift.Int?
+  public init?(map: DDoctorSDK.Map)
+  public mutating func mapping(map: DDoctorSDK.Map)
+}
+public struct CBC : DDoctorSDK.BlockMode {
+  public enum Error : Swift.Error {
+    case invalidInitializationVector
+    public static func == (a: DDoctorSDK.CBC.Error, b: DDoctorSDK.CBC.Error) -> Swift.Bool
+    public func hash(into hasher: inout Swift.Hasher)
+    public var hashValue: Swift.Int {
+      get
+    }
+  }
+  public let options: DDoctorSDK.BlockModeOption
+  public let customBlockSize: Swift.Int?
+  public init(iv: Swift.Array<Swift.UInt8>)
+  public func worker(blockSize: Swift.Int, cipherOperation: @escaping DDoctorSDK.CipherOperationOnBlock, encryptionOperation: @escaping DDoctorSDK.CipherOperationOnBlock) throws -> DDoctorSDK.CipherModeWorker
+}
+@_inheritsConvenienceInitializers final public class CBCMAC : DDoctorSDK.CMAC {
+  override final public func authenticate(_ bytes: Swift.Array<Swift.UInt8>) throws -> Swift.Array<Swift.UInt8>
+  override public init(key: Swift.Array<Swift.UInt8>) throws
+  @objc deinit
+}
+public struct CCM {
+  public enum Error : Swift.Error {
+    case invalidInitializationVector
+    case invalidParameter
+    case fail
+    public static func == (a: DDoctorSDK.CCM.Error, b: DDoctorSDK.CCM.Error) -> Swift.Bool
+    public func hash(into hasher: inout Swift.Hasher)
+    public var hashValue: Swift.Int {
+      get
+    }
+  }
+  public let options: DDoctorSDK.BlockModeOption
+  public let customBlockSize: Swift.Int?
+  public var authenticationTag: Swift.Array<Swift.UInt8>?
+  public init(iv: Swift.Array<Swift.UInt8>, tagLength: Swift.Int, messageLength: Swift.Int, additionalAuthenticatedData: Swift.Array<Swift.UInt8>? = nil)
+  public init(iv: Swift.Array<Swift.UInt8>, tagLength: Swift.Int, messageLength: Swift.Int, authenticationTag: Swift.Array<Swift.UInt8>, additionalAuthenticatedData: Swift.Array<Swift.UInt8>? = nil)
+  public func worker(blockSize: Swift.Int, cipherOperation: @escaping DDoctorSDK.CipherOperationOnBlock, encryptionOperation: @escaping DDoctorSDK.CipherOperationOnBlock) throws -> DDoctorSDK.CipherModeWorker
+}
+public struct CFB : DDoctorSDK.BlockMode {
+  public enum Error : Swift.Error {
+    case invalidInitializationVector
+    public static func == (a: DDoctorSDK.CFB.Error, b: DDoctorSDK.CFB.Error) -> Swift.Bool
+    public func hash(into hasher: inout Swift.Hasher)
+    public var hashValue: Swift.Int {
+      get
+    }
+  }
+  public enum SegmentSize : Swift.Int {
+    case cfb8
+    case cfb128
+    public init?(rawValue: Swift.Int)
+    public typealias RawValue = Swift.Int
+    public var rawValue: Swift.Int {
+      get
+    }
+  }
+  public let options: DDoctorSDK.BlockModeOption
+  public let customBlockSize: Swift.Int?
+  public init(iv: Swift.Array<Swift.UInt8>, segmentSize: DDoctorSDK.CFB.SegmentSize = .cfb128)
+  public func worker(blockSize: Swift.Int, cipherOperation: @escaping DDoctorSDK.CipherOperationOnBlock, encryptionOperation: @escaping DDoctorSDK.CipherOperationOnBlock) throws -> DDoctorSDK.CipherModeWorker
+}
+extension ChaCha20 {
+  convenience public init(key: Swift.String, iv: Swift.String) throws
+}
+final public class ChaCha20 {
+  public enum Error : Swift.Error {
+    case invalidKeyOrInitializationVector
+    case notSupported
+    public static func == (a: DDoctorSDK.ChaCha20.Error, b: DDoctorSDK.ChaCha20.Error) -> Swift.Bool
+    public func hash(into hasher: inout Swift.Hasher)
+    public var hashValue: Swift.Int {
+      get
+    }
+  }
+  public static let blockSize: Swift.Int
+  final public let keySize: Swift.Int
+  public init(key: Swift.Array<Swift.UInt8>, iv nonce: Swift.Array<Swift.UInt8>) throws
+  @objc deinit
+}
+extension ChaCha20 : DDoctorSDK.Cipher {
+  final public func encrypt(_ bytes: Swift.ArraySlice<Swift.UInt8>) throws -> Swift.Array<Swift.UInt8>
+  final public func decrypt(_ bytes: Swift.ArraySlice<Swift.UInt8>) throws -> Swift.Array<Swift.UInt8>
+}
+extension ChaCha20 {
+  public struct ChaChaEncryptor : DDoctorSDK.Cryptor, DDoctorSDK.Updatable {
+    public mutating func update(withBytes bytes: Swift.ArraySlice<Swift.UInt8>, isLast: Swift.Bool = false) throws -> Swift.Array<Swift.UInt8>
+    public func seek(to: Swift.Int) throws
+  }
+}
+extension ChaCha20 {
+  public struct ChaChaDecryptor : DDoctorSDK.Cryptor, DDoctorSDK.Updatable {
+    public mutating func update(withBytes bytes: Swift.ArraySlice<Swift.UInt8>, isLast: Swift.Bool = true) throws -> Swift.Array<Swift.UInt8>
+    public func seek(to: Swift.Int) throws
+  }
+}
+extension ChaCha20 : DDoctorSDK.Cryptors {
+  final public func makeEncryptor() -> DDoctorSDK.Cryptor & DDoctorSDK.Updatable
+  final public func makeDecryptor() -> DDoctorSDK.Cryptor & DDoctorSDK.Updatable
+}
+final public class Checksum {
+  @usableFromInline
+  internal static let table32: [Swift.UInt32]
+  @usableFromInline
+  internal static let table32c: [Swift.UInt32]
+  @usableFromInline
+  internal static let table16: [Swift.UInt16]
+  @usableFromInline
+  internal init()
+  @inlinable final internal func crc32(_ message: Swift.Array<Swift.UInt8>, seed: Swift.UInt32? = nil, reflect: Swift.Bool = true) -> Swift.UInt32 {
+    var crc: UInt32 = seed != nil ? seed! : 0xFFFF_FFFF
+    for chunk in message.batched(by: 256) {
+      for b in chunk {
+        let idx = Int((crc ^ UInt32(reflect ? b : reversed(b))) & 0xFF)
+        crc = (crc >> 8) ^ Checksum.table32[idx]
+      }
+    }
+    return (reflect ? crc : reversed(crc)) ^ 0xFFFF_FFFF
+  }
+  @inlinable final internal func crc32c(_ message: Swift.Array<Swift.UInt8>, seed: Swift.UInt32? = nil, reflect: Swift.Bool = true) -> Swift.UInt32 {
+    var crc: UInt32 = seed != nil ? seed! : 0xFFFF_FFFF
+    for chunk in message.batched(by: 256) {
+      for b in chunk {
+        let idx = Int((crc ^ UInt32(reflect ? b : reversed(b))) & 0xFF)
+        crc = (crc >> 8) ^ Checksum.table32c[idx]
+      }
+    }
+    return (reflect ? crc : reversed(crc)) ^ 0xFFFF_FFFF
+  }
+  @inlinable final internal func crc16(_ message: Swift.Array<Swift.UInt8>, seed: Swift.UInt16? = nil) -> Swift.UInt16 {
+    var crc: UInt16 = seed != nil ? seed! : 0x0000
+    for chunk in message.batched(by: 256) {
+      for b in chunk {
+        crc = (crc >> 8) ^ Checksum.table16[Int((crc ^ UInt16(b)) & 0xFF)]
+      }
+    }
+    return crc
+  }
+  @objc deinit
+}
+extension Checksum {
+  @inlinable public static func crc32(_ message: Swift.Array<Swift.UInt8>, seed: Swift.UInt32? = nil, reflect: Swift.Bool = true) -> Swift.UInt32 {
+    Checksum().crc32(message, seed: seed, reflect: reflect)
+  }
+  @inlinable public static func crc32c(_ message: Swift.Array<Swift.UInt8>, seed: Swift.UInt32? = nil, reflect: Swift.Bool = true) -> Swift.UInt32 {
+    Checksum().crc32c(message, seed: seed, reflect: reflect)
+  }
+  @inlinable public static func crc16(_ message: Swift.Array<Swift.UInt8>, seed: Swift.UInt16? = nil) -> Swift.UInt16 {
+    Checksum().crc16(message, seed: seed)
+  }
+}
+public enum CipherError : Swift.Error {
+  case encrypt
+  case decrypt
+  public static func == (a: DDoctorSDK.CipherError, b: DDoctorSDK.CipherError) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+public protocol Cipher : AnyObject {
+  var keySize: Swift.Int { get }
+  func encrypt(_ bytes: Swift.ArraySlice<Swift.UInt8>) throws -> Swift.Array<Swift.UInt8>
+  func encrypt(_ bytes: Swift.Array<Swift.UInt8>) throws -> Swift.Array<Swift.UInt8>
+  func decrypt(_ bytes: Swift.ArraySlice<Swift.UInt8>) throws -> Swift.Array<Swift.UInt8>
+  func decrypt(_ bytes: Swift.Array<Swift.UInt8>) throws -> Swift.Array<Swift.UInt8>
+}
+extension Cipher {
+  public func encrypt(_ bytes: Swift.Array<Swift.UInt8>) throws -> Swift.Array<Swift.UInt8>
+  public func decrypt(_ bytes: Swift.Array<Swift.UInt8>) throws -> Swift.Array<Swift.UInt8>
+}
+public protocol CipherModeWorker {
+  var cipherOperation: DDoctorSDK.CipherOperationOnBlock { get }
+  var additionalBufferSize: Swift.Int { get }
+  @inlinable mutating func encrypt(block plaintext: Swift.ArraySlice<Swift.UInt8>) -> Swift.Array<Swift.UInt8>
+  @inlinable mutating func decrypt(block ciphertext: Swift.ArraySlice<Swift.UInt8>) -> Swift.Array<Swift.UInt8>
+}
+public protocol BlockModeWorker : DDoctorSDK.CipherModeWorker {
+  var blockSize: Swift.Int { get }
+}
+public protocol CounterModeWorker : DDoctorSDK.CipherModeWorker {
+  associatedtype Counter
+  var counter: Self.Counter { get set }
+}
+public protocol SeekableModeWorker : DDoctorSDK.CipherModeWorker {
+  mutating func seek(to position: Swift.Int) throws
+}
+public protocol StreamModeWorker : DDoctorSDK.CipherModeWorker {
+}
+public protocol FinalizingEncryptModeWorker : DDoctorSDK.CipherModeWorker {
+  mutating func finalize(encrypt ciphertext: Swift.ArraySlice<Swift.UInt8>) throws -> Swift.ArraySlice<Swift.UInt8>
+}
+public protocol FinalizingDecryptModeWorker : DDoctorSDK.CipherModeWorker {
+  @discardableResult
+  mutating func willDecryptLast(bytes ciphertext: Swift.ArraySlice<Swift.UInt8>) throws -> Swift.ArraySlice<Swift.UInt8>
+  mutating func didDecryptLast(bytes plaintext: Swift.ArraySlice<Swift.UInt8>) throws -> Swift.ArraySlice<Swift.UInt8>
+  mutating func finalize(decrypt plaintext: Swift.ArraySlice<Swift.UInt8>) throws -> Swift.ArraySlice<Swift.UInt8>
+}
+public class CMAC : DDoctorSDK.Authenticator {
+  public enum Error : Swift.Error {
+    case wrongKeyLength
+    public static func == (a: DDoctorSDK.CMAC.Error, b: DDoctorSDK.CMAC.Error) -> Swift.Bool
+    public func hash(into hasher: inout Swift.Hasher)
+    public var hashValue: Swift.Int {
+      get
+    }
+  }
+  public init(key: Swift.Array<Swift.UInt8>) throws
+  public func authenticate(_ bytes: Swift.Array<Swift.UInt8>) throws -> Swift.Array<Swift.UInt8>
+  public func authenticate(_ bytes: Swift.Array<Swift.UInt8>, cipher: DDoctorSDK.Cipher) throws -> Swift.Array<Swift.UInt8>
+  @objc deinit
+}
+extension Collection where Self.Element == Swift.UInt8, Self.Index == Swift.Int {
+  @inlinable internal func toUInt32Array() -> Swift.Array<Swift.UInt32> {
+    guard !isEmpty else {
+      return []
+    }
+
+    let c = strideCount(from: startIndex, to: endIndex, by: 4)
+    return Array<UInt32>(unsafeUninitializedCapacity: c) { buf, count in
+      var counter = 0
+      for idx in stride(from: startIndex, to: endIndex, by: 4) {
+        let val = UInt32(bytes: self, fromIndex: idx).bigEndian
+        buf[counter] = val
+        counter += 1
+      }
+      count = counter
+      assert(counter == c)
+    }
+  }
+  @inlinable internal func toUInt64Array() -> Swift.Array<Swift.UInt64> {
+    guard !isEmpty else {
+      return []
+    }
+
+    let c = strideCount(from: startIndex, to: endIndex, by: 8)
+    return Array<UInt64>(unsafeUninitializedCapacity: c) { buf, count in
+      var counter = 0
+      for idx in stride(from: startIndex, to: endIndex, by: 8) {
+        let val = UInt64(bytes: self, fromIndex: idx).bigEndian
+        buf[counter] = val
+        counter += 1
+      }
+      count = counter
+      assert(counter == c)
+    }
+  }
+}
+@usableFromInline
+internal func strideCount(from: Swift.Int, to: Swift.Int, by: Swift.Int) -> Swift.Int
+@objc @_inheritsConvenienceInitializers public class CommentBaseVC : UIKit.UIViewController {
+  @objc override dynamic public func viewWillAppear(_ animated: Swift.Bool)
+  @objc override dynamic public init(nibName nibNameOrNil: Swift.String?, bundle nibBundleOrNil: Foundation.Bundle?)
+  @objc required dynamic public init?(coder: Foundation.NSCoder)
+  @objc deinit
+}
+@objc @_inheritsConvenienceInitializers public class CommentVC : DDoctorSDK.CommentBaseVC {
+  @objc override dynamic public func viewDidLoad()
+  public static func show(_ orderId: Swift.String, docId: Swift.String, uuid: Swift.Int?, type: DDoctorSDK.DrantCallType?, _ model: DDoctorSDK.DrantGetQuesetionModel?)
+  @objc override dynamic public init(nibName nibNameOrNil: Swift.String?, bundle nibBundleOrNil: Foundation.Bundle?)
+  @objc required dynamic public init?(coder: Foundation.NSCoder)
+  @objc deinit
+}
+extension String {
+  public func subTo(_ index: Swift.Int) -> Swift.String
+}
+extension UIImageView {
+  public func d_image(url: Foundation.URL?)
+  public func d_image(url: Foundation.URL?, complete: ((UIKit.UIImage?, Foundation.URL?) -> Swift.Void)?)
+  public func d_image(url: Foundation.URL?, placeHolder: UIKit.UIImage?)
+  public func d_image(url: Foundation.URL?, placeHolder: UIKit.UIImage?, progresses: ((CoreGraphics.CGFloat) -> Swift.Void)?, complete: ((UIKit.UIImage?, Foundation.URL?) -> Swift.Void)?)
+}
+public func d_downloadImg(_ url: Foundation.URL?, finish: @escaping ((UIKit.UIImage?, Foundation.Data?, Swift.Error?) -> Swift.Void))
+public protocol Cryptor {
+  mutating func seek(to: Swift.Int) throws
+}
+public protocol Cryptors : AnyObject {
+  func makeEncryptor() throws -> DDoctorSDK.Cryptor & DDoctorSDK.Updatable
+  func makeDecryptor() throws -> DDoctorSDK.Cryptor & DDoctorSDK.Updatable
+  static func randomIV(_ blockSize: Swift.Int) -> Swift.Array<Swift.UInt8>
+}
+extension Cryptors {
+  public static func randomIV(_ count: Swift.Int) -> Swift.Array<Swift.UInt8>
+}
+public struct CTR {
+  public enum Error : Swift.Error {
+    case invalidInitializationVector
+    public static func == (a: DDoctorSDK.CTR.Error, b: DDoctorSDK.CTR.Error) -> Swift.Bool
+    public func hash(into hasher: inout Swift.Hasher)
+    public var hashValue: Swift.Int {
+      get
+    }
+  }
+  public let options: DDoctorSDK.BlockModeOption
+  public let customBlockSize: Swift.Int?
+  public init(iv: Swift.Array<Swift.UInt8>, counter: Swift.Int = 0)
+  public func worker(blockSize: Swift.Int, cipherOperation: @escaping DDoctorSDK.CipherOperationOnBlock, encryptionOperation: @escaping DDoctorSDK.CipherOperationOnBlock) throws -> DDoctorSDK.CipherModeWorker
+}
+extension Data {
+  public func checksum() -> Swift.UInt16
+  public func md5() -> Foundation.Data
+  public func sha1() -> Foundation.Data
+  public func sha224() -> Foundation.Data
+  public func sha256() -> Foundation.Data
+  public func sha384() -> Foundation.Data
+  public func sha512() -> Foundation.Data
+  public func sha3(_ variant: DDoctorSDK.SHA3.Variant) -> Foundation.Data
+  public func crc32(seed: Swift.UInt32? = nil, reflect: Swift.Bool = true) -> Foundation.Data
+  public func crc32c(seed: Swift.UInt32? = nil, reflect: Swift.Bool = true) -> Foundation.Data
+  public func crc16(seed: Swift.UInt16? = nil) -> Foundation.Data
+  public func encrypt(cipher: DDoctorSDK.Cipher) throws -> Foundation.Data
+  public func decrypt(cipher: DDoctorSDK.Cipher) throws -> Foundation.Data
+  public func authenticate(with authenticator: DDoctorSDK.Authenticator) throws -> Foundation.Data
+}
+extension Data {
+  public init(hex: Swift.String)
+  public var bytes: Swift.Array<Swift.UInt8> {
+    get
+  }
+  public func toHexString() -> Swift.String
+}
+public struct DGElasticPullToRefreshConstants {
+  public static var WaveMaxHeight: CoreGraphics.CGFloat
+  public static var MinOffsetToPull: CoreGraphics.CGFloat
+  public static var LoadingContentInset: CoreGraphics.CGFloat
+  public static var LoadingViewSize: CoreGraphics.CGFloat
+}
+extension NSObject {
+  public func dg_addObserver(_ observer: ObjectiveC.NSObject, forKeyPath keyPath: Swift.String)
+  public func dg_removeObserver(_ observer: ObjectiveC.NSObject, forKeyPath keyPath: Swift.String)
+}
+extension UIScrollView {
+  public func dg_addPullToRefreshWithActionHandler(_ actionHandler: @escaping () -> Swift.Void, loadingView: DDoctorSDK.DGElasticPullToRefreshLoadingView?)
+  public func dg_removePullToRefresh()
+  public func dg_setPullToRefreshBackgroundColor(_ color: UIKit.UIColor)
+  public func dg_setPullToRefreshFillColor(_ color: UIKit.UIColor)
+  public func dg_stopLoading()
+  public func dg_startLoading()
+}
+extension UIView {
+  public func dg_center(_ usePresentationLayerIfPossible: Swift.Bool) -> CoreGraphics.CGPoint
+}
+extension UIPanGestureRecognizer {
+  public func dg_resign()
+}
+extension UIGestureRecognizer.State {
+  public func dg_isAnyOf(_ values: [UIKit.UIGestureRecognizer.State]) -> Swift.Bool
+}
+@objc @_inheritsConvenienceInitializers open class DGElasticPullToRefreshLoadingView : UIKit.UIView {
+  @objc dynamic public init()
+  @objc override dynamic public init(frame: CoreGraphics.CGRect)
+  @objc required dynamic public init?(coder aDecoder: Foundation.NSCoder)
+  open func setPullProgress(_ progress: CoreGraphics.CGFloat)
+  open func startAnimating()
+  open func stopLoading()
+  @objc deinit
+}
+extension CGFloat {
+  public func toRadians() -> CoreGraphics.CGFloat
+  public func toDegrees() -> CoreGraphics.CGFloat
+}
+@objc open class DGElasticPullToRefreshLoadingViewCircle : DDoctorSDK.DGElasticPullToRefreshLoadingView {
+  @objc override dynamic public init()
+  @objc required dynamic public init?(coder aDecoder: Foundation.NSCoder)
+  override open func setPullProgress(_ progress: CoreGraphics.CGFloat)
+  override open func startAnimating()
+  override open func stopLoading()
+  @objc override dynamic open func tintColorDidChange()
+  @objc override dynamic open func layoutSubviews()
+  @objc override dynamic public init(frame: CoreGraphics.CGRect)
+  @objc deinit
+}
+public enum DGElasticPullToRefreshState : Swift.Int {
+  case stopped
+  case dragging
+  case animatingBounce
+  case loading
+  case animatingToStopped
+  public init?(rawValue: Swift.Int)
+  public typealias RawValue = Swift.Int
+  public var rawValue: Swift.Int {
+    get
+  }
+}
+@objc @_hasMissingDesignatedInitializers open class DGElasticPullToRefreshView : UIKit.UIView {
+  @objc required dynamic public init?(coder aDecoder: Foundation.NSCoder)
+  @objc deinit
+  @objc override dynamic open func observeValue(forKeyPath keyPath: Swift.String?, of object: Any?, change: [Foundation.NSKeyValueChangeKey : Any]?, context: Swift.UnsafeMutableRawPointer?)
+  @objc override dynamic open func layoutSubviews()
+  @objc override dynamic public init(frame: CoreGraphics.CGRect)
+}
+@available(*, renamed: "Digest")
+public typealias Hash = DDoctorSDK.Digest
+public struct Digest {
+  public static func md5(_ bytes: Swift.Array<Swift.UInt8>) -> Swift.Array<Swift.UInt8>
+  public static func sha1(_ bytes: Swift.Array<Swift.UInt8>) -> Swift.Array<Swift.UInt8>
+  public static func sha224(_ bytes: Swift.Array<Swift.UInt8>) -> Swift.Array<Swift.UInt8>
+  public static func sha256(_ bytes: Swift.Array<Swift.UInt8>) -> Swift.Array<Swift.UInt8>
+  public static func sha384(_ bytes: Swift.Array<Swift.UInt8>) -> Swift.Array<Swift.UInt8>
+  public static func sha512(_ bytes: Swift.Array<Swift.UInt8>) -> Swift.Array<Swift.UInt8>
+  public static func sha2(_ bytes: Swift.Array<Swift.UInt8>, variant: DDoctorSDK.SHA2.Variant) -> Swift.Array<Swift.UInt8>
+  public static func sha3(_ bytes: Swift.Array<Swift.UInt8>, variant: DDoctorSDK.SHA3.Variant) -> Swift.Array<Swift.UInt8>
+}
+@objc @_inheritsConvenienceInitializers public class DrantAccountManager : ObjectiveC.NSObject {
+  public static func getUUID() -> Swift.String?
+  @objc override dynamic public init()
+  @objc deinit
+}
+public class DrantCameraConfig {
+  weak public var sender: UIKit.UIViewController!
+  public var mediaType: DDoctorSDK.DrantMediaType
+  public var isGrayCam: Swift.Bool
+  public var canReduce: Swift.Bool
+  public var autoUpload: Swift.Bool
+  public var maxCount: Swift.Int?
+  public var crop: DDoctorSDK.onCropFinish?
+  public var canceled: DDoctorSDK.onCanceled?
+  public init()
+  public func build(_ block: (inout DDoctorSDK.DrantCameraConfig) -> Swift.Void) -> DDoctorSDK.DrantCameraConfig
+  @objc deinit
+}
+@objc @_inheritsConvenienceInitializers open class DrantDeviceManager : ObjectiveC.NSObject {
+  public static func jailBrokend() -> Swift.Bool
+  @objc override dynamic public init()
+  @objc deinit
+}
+public struct DrantEmptyModel : DDoctorSDK.Mappable {
+  public init()
+  public init?(map: DDoctorSDK.Map)
+  public mutating func mapping(map: DDoctorSDK.Map)
+}
+@_hasMissingDesignatedInitializers public class DrantEncryptUtils {
+  public static func encrypto(key: Swift.String, content: Swift.String) -> Swift.String?
+  public static func decrypto(key: Swift.String, content: Swift.String) -> Swift.String?
+  public static func encrypto(key: Swift.String, content: Foundation.Data) -> Foundation.Data?
+  public static func decrypto(key: Swift.String, content: Foundation.Data) -> Foundation.Data?
+  @objc deinit
+}
+@objc @_inheritsConvenienceInitializers public class DrantFileCacheManager : ObjectiveC.NSObject {
+  public enum DrantAssetPathType {
+    case image
+    case video
+    case sound
+    case dicom
+    case fb
+    case other
+    case dataBase
+    public static func == (a: DDoctorSDK.DrantFileCacheManager.DrantAssetPathType, b: DDoctorSDK.DrantFileCacheManager.DrantAssetPathType) -> Swift.Bool
+    public func hash(into hasher: inout Swift.Hasher)
+    public var hashValue: Swift.Int {
+      get
+    }
+  }
+  @objc override dynamic public init()
+  @objc deinit
+}
+extension DrantFileCacheManager {
+  public class func getFileFormat(_ name: Swift.String) -> DDoctorSDK.DrantFileCacheManager.DrantAssetPathType
+  public class func getFilePath(_ name: Swift.String) -> Swift.String?
+}
+extension DrantFileCacheManager {
+  public static func saveString2File(_ string: Swift.String?, fileName: Swift.String)
+  public static func stringFromFile(_ fileName: Swift.String) -> Swift.String?
+}
+public var uploadManager: DDoctorSDK.UploadQueue {
+  get
+}
+@_hasMissingDesignatedInitializers public class UploadQueue {
+  @discardableResult
+  public func upload(files: [Swift.String], config: DDoctorSDK.DrantUploadConfig) -> DDoctorSDK.DrantFileUploadManager
+  public func cancelAll(_ finished: (() -> Swift.Void)? = nil)
+  @objc deinit
+}
+public class DrantFileUploadManager {
+  public var mFileQueue: [Swift.String]
+  public var config: DDoctorSDK.DrantUploadConfig!
+  public var mTransFile: Swift.String?
+  public var isUploading: Swift.Bool
+  public init(files: [Swift.String], config: DDoctorSDK.DrantUploadConfig)
+  public func uploadFile(_ file: [Swift.String])
+  public func cancalFiles(_ files: [Swift.String], cancelFinish: ((Swift.String) -> Swift.Void)? = nil)
+  public func cancelAll(_ finished: (() -> Swift.Void)? = nil)
+  @objc deinit
+}
+public protocol DrantHUDable {
+  var autoDismissDuration: Foundation.TimeInterval { get }
+  func showHUD()
+  func dismissHUD()
+  func showSuccess(_ message: Swift.String?)
+  func showError(_ messgae: Swift.String?)
+  func setDismissDuration(_ duraion: Foundation.TimeInterval)
+}
+public struct DrantInviteDocModel : DDoctorSDK.Mappable {
+  public var orderId: Swift.String?
+  public var channelId: Swift.UInt64?
+  public var doctorId: Swift.String?
+  public var imageUrl: Swift.String?
+  public var signalingType: Swift.String?
+  public var width: CoreGraphics.CGFloat
+  public var height: CoreGraphics.CGFloat
+  public init?(map: DDoctorSDK.Map)
+  public init(_ info: DDoctorSDK.DrantNetCallChatInfo, meetId: Swift.UInt64?)
+  public func isWhiteBoard() -> Swift.Bool
+  public func isMultyCall() -> Swift.Bool
+  public mutating func mapping(map: DDoctorSDK.Map)
+}
+@_inheritsConvenienceInitializers @objc public class DrantLocation : ObjectiveC.NSObject {
+  @objc public static let `default`: DDoctorSDK.DrantLocation
+  @objc public func startLocation(lng: Swift.String, lat: Swift.String)
+  @objc public func closeLocation()
+  @objc override dynamic public init()
+  @objc deinit
+}
+public enum DrantLogMode : Swift.Int {
+  case error
+  case warn
+  case info
+  case debug
+  case verbose
+  public init?(rawValue: Swift.Int)
+  public typealias RawValue = Swift.Int
+  public var rawValue: Swift.Int {
+    get
+  }
+}
+public func logging(type: DDoctorSDK.DrantLogMode = .info, _ tip: Swift.String)
+@objc @_inheritsConvenienceInitializers open class DrantMediaStatusCheckUtils : ObjectiveC.NSObject {
+  open class func checkCameraAccess() -> Swift.Bool
+  open class func checkCameraVideoPermission() -> Swift.Bool
+  open class func checkAlbumAccess() -> Swift.Bool
+  open class func checkAudioAccess() -> Swift.Bool
+  @objc override dynamic public init()
+  @objc deinit
+}
+@_hasMissingDesignatedInitializers public class DrantModelCache {
+  public static let instance: DDoctorSDK.DrantModelCache
+  public func cacheModel(_ name: Swift.String, content: Swift.String?)
+  public func cacheModel(_ name: Swift.String, content: Foundation.Data?)
+  public func getCahceInfo(_ docId: Swift.String?, name: Swift.String, key: Swift.String) -> Swift.String?
+  public func getCacheAsync(_ docId: Swift.String?, name: Swift.String, key: Swift.String, callback: @escaping ((Swift.String?) -> Swift.Void))
+  @objc deinit
+}
+public struct DrantNetCallChatInfo {
+  public init()
+  public init(_ model: DDoctorSDK.CallDoctorModel?)
+}
+@objc @_inheritsConvenienceInitializers @_hasMissingDesignatedInitializers @IBDesignable public class DrantPagerView : UIKit.UIView, UIKit.UICollectionViewDataSource, UIKit.UICollectionViewDelegate {
+  @objc required dynamic public init?(coder aDecoder: Foundation.NSCoder)
+  @objc override dynamic public func layoutSubviews()
+  @objc override dynamic public func willMove(toWindow newWindow: UIKit.UIWindow?)
+  @objc override dynamic public func prepareForInterfaceBuilder()
+  @objc deinit
+  @objc public func numberOfSections(in collectionView: UIKit.UICollectionView) -> Swift.Int
+  @objc public func collectionView(_ collectionView: UIKit.UICollectionView, numberOfItemsInSection section: Swift.Int) -> Swift.Int
+  @objc public func collectionView(_ collectionView: UIKit.UICollectionView, cellForItemAt indexPath: Foundation.IndexPath) -> UIKit.UICollectionViewCell
+  @objc public func collectionView(_ collectionView: UIKit.UICollectionView, shouldHighlightItemAt indexPath: Foundation.IndexPath) -> Swift.Bool
+  @objc public func collectionView(_ collectionView: UIKit.UICollectionView, didHighlightItemAt indexPath: Foundation.IndexPath)
+  @objc public func collectionView(_ collectionView: UIKit.UICollectionView, shouldSelectItemAt indexPath: Foundation.IndexPath) -> Swift.Bool
+  @objc public func collectionView(_ collectionView: UIKit.UICollectionView, didSelectItemAt indexPath: Foundation.IndexPath)
+  @objc public func collectionView(_ collectionView: UIKit.UICollectionView, willDisplay cell: UIKit.UICollectionViewCell, forItemAt indexPath: Foundation.IndexPath)
+  @objc public func collectionView(_ collectionView: UIKit.UICollectionView, didEndDisplaying cell: UIKit.UICollectionViewCell, forItemAt indexPath: Foundation.IndexPath)
+  @objc public func scrollViewDidScroll(_ scrollView: UIKit.UIScrollView)
+  @objc public func scrollViewWillBeginDragging(_ scrollView: UIKit.UIScrollView)
+  @objc public func scrollViewWillEndDragging(_ scrollView: UIKit.UIScrollView, withVelocity velocity: CoreGraphics.CGPoint, targetContentOffset: Swift.UnsafeMutablePointer<CoreGraphics.CGPoint>)
+  @objc public func scrollViewDidEndDecelerating(_ scrollView: UIKit.UIScrollView)
+  @objc public func scrollViewDidEndScrollingAnimation(_ scrollView: UIKit.UIScrollView)
+}
+@objc @_inheritsConvenienceInitializers public class DrantPhotoPickerController : UIKit.UINavigationController {
+  @objc override dynamic public func viewDidLoad()
+  convenience public init(localPath: Swift.String? = nil, deleteMode: Swift.Bool = false, finish: (([DDoctorSDK.DrantCameraImageModel]?) -> Swift.Void)? = nil)
+  public static func selectLocalImags(path: Swift.String? = nil, finish: (([DDoctorSDK.DrantCameraImageModel]?) -> Swift.Void)?) -> DDoctorSDK.DrantPhotoPickerController
+  @objc deinit
+  @available(iOS 5.0, *)
+  @objc override dynamic public init(navigationBarClass: Swift.AnyClass?, toolbarClass: Swift.AnyClass?)
+  @objc override dynamic public init(rootViewController: UIKit.UIViewController)
+  @objc override dynamic public init(nibName nibNameOrNil: Swift.String?, bundle nibBundleOrNil: Foundation.Bundle?)
+  @objc required dynamic public init?(coder aDecoder: Foundation.NSCoder)
+}
+public class DrantRequest<T> where T : DDoctorSDK.Mappable {
+  public typealias DrantNetSuccess = (T) -> Swift.Void
+  public typealias DrantNetSuccessForArray = ([T]) -> Swift.Void
+  public var mRequestData: DDoctorSDK.DrantRequestData?
+  public var mRequestFail: DDoctorSDK.DrantNetError?
+  public var mRequestSuccess: DDoctorSDK.DrantRequest<T>.DrantNetSuccess?
+  public var mRequestSuccessNoData: DDoctorSDK.DrantNetSuccessNoData?
+  public var mRequestSuccessForArray: DDoctorSDK.DrantRequest<T>.DrantNetSuccessForArray?
+  public var mConfig: DDoctorSDK.DrantRequestConfig?
+  required public init(aRequestConfig: DDoctorSDK.DrantRequestConfig, requestData: DDoctorSDK.DrantRequestData? = nil)
+  public func start()
+  public func cancel()
+  @objc deinit
+}
+public protocol DrantRequestConfig {
+  func serviceURLSuffix() -> Swift.String
+  func isNeedUserInfo() -> Swift.Bool
+  func requestMethod() -> DDoctorSDK.DrantRequestMethod
+  func requestType() -> DDoctorSDK.DrantServerType
+  func extensionUrlHost() -> Swift.String?
+  func needSaveCache() -> Swift.Bool
+  func cacheKey() -> Swift.String?
+  func loadAppVersion() -> Swift.Bool
+  func needDNS() -> Swift.Bool
+  func needEncrypt() -> Swift.Bool
+}
+extension DrantRequestConfig {
+  public func needSaveCache() -> Swift.Bool
+  public func cacheKey() -> Swift.String?
+  public func isNeedUserInfo() -> Swift.Bool
+  public func requestMethod() -> DDoctorSDK.DrantRequestMethod
+  public func requestType() -> DDoctorSDK.DrantServerType
+  public func extensionUrlHost() -> Swift.String?
+  public func isHaveExtensionUrl() -> Swift.Bool
+  public func loadAppVersion() -> Swift.Bool
+  public func needDNS() -> Swift.Bool
+  public func needEncrypt() -> Swift.Bool
+}
+public typealias DrantLoginHandler = ((Swift.String?) -> Swift.Void)
+@_inheritsConvenienceInitializers @objc public class DrantSDK : ObjectiveC.NSObject {
+  @objc public static let `default`: DDoctorSDK.DrantSDK
+  @objc public func start(option: DDoctorSDK.DrantSDKOptions)
+  @objc public func login(userToken: Swift.String, completion: @escaping DDoctorSDK.DrantLoginHandler)
+  @available(*, deprecated, message: "Use login(userToken: String, completion: @escaping DrantLoginHandler) instead.")
+  @objc public func login(uuid: Swift.Int, completion: @escaping DDoctorSDK.DrantLoginHandler)
+  @objc public func logout(complete: ((Swift.String?) -> Swift.Void)? = nil)
+  @objc public func switchEnv(_ development: Swift.Bool)
+  @objc public func startCall(_ type: DDoctorSDK.DrantCallType)
+  @objc public func updateAPNS(token: Foundation.Data)
+  @objc public var SDKVersion: Swift.String {
+    @objc get
+  }
+  @objc public var isLogined: Swift.Bool {
+    @objc get
+  }
+  @objc public var userToken: Swift.String? {
+    @objc get
+  }
+  @objc public func add(delegate: DDoctorSDK.DrantVideoDelegate)
+  @objc public func remove(delegate: DDoctorSDK.DrantVideoDelegate)
+  @objc public var aliPayHook: ((Swift.String, Swift.String, @escaping (([Swift.String : Any]) -> Swift.Void)) -> Swift.Bool)?
+  @objc override dynamic public init()
+  @objc deinit
+}
+extension DrantSDK {
+  @available(*, deprecated, message: "Use call(userToken : String) instead.")
+  @objc dynamic public func startNewCall(_ uuid: Swift.Int)
+}
+extension DrantSDK {
+  @objc dynamic public func call(userToken: Swift.String)
+}
+extension DrantSDK {
+  @objc dynamic public func startTeamCall(_ type: DDoctorSDK.DrantCallType, callee: DDoctorSDK.DrantCallerInfo)
+}
+extension DrantSDK {
+  @objc dynamic public func getMedicDetail(userToken: Swift.String, medicId: Swift.String) -> Swift.String
+  @objc dynamic public func getMedicList(userToken: Swift.String) -> Swift.String
+  @objc dynamic public func getAllMedics(userToken: Swift.String) -> Swift.String
+}
+@objc public enum DrantLoginCode : Swift.Int {
+  case OK = 0
+  case netError = -1
+  public init?(rawValue: Swift.Int)
+  public typealias RawValue = Swift.Int
+  public var rawValue: Swift.Int {
+    get
+  }
+}
+@objc public enum SkipType : Swift.Int {
+  case push
+  case present
+  public init?(rawValue: Swift.Int)
+  public typealias RawValue = Swift.Int
+  public var rawValue: Swift.Int {
+    get
+  }
+}
+public var DrantDefaultOpt: DDoctorSDK.DrantSDKOptions {
+  get
+}
+public var DrantHudManager: DDoctorSDK.DrantHUDable {
+  get
+}
+@objc public class DrantSDKOptions : ObjectiveC.NSObject {
+  @objc public static let `default`: DDoctorSDK.DrantSDKOptions
+  @objc public var hudDisTime: Swift.Double {
+    @objc get
+    @objc set
+  }
+  @objc public var isDebug: Swift.Bool
+  @objc public var isDevelopment: Swift.Bool
+  public var hudManager: DDoctorSDK.DrantHUDable
+  @objc public var productId: Swift.String
+  @objc public var cerName: Swift.String?
+  public var mExtension: Swift.String
+  @objc public var changeDoctorTime: Swift.Int
+  public var logCallback: ((Swift.String) -> Swift.Void)?
+  @objc public var mVideoOptions: DDoctorSDK.VideoOptions
+  @objc public var mMessageOptions: DDoctorSDK.MessageOptions
+  @objc public var mUserCenterOptions: DDoctorSDK.UsercenterOptions
+  final public let sdkVersion: Swift.String
+  final public let appVersion: Swift.String
+  @objc public init(productId: Swift.String, isDebug: Swift.Bool = true, isDevelop: Swift.Bool = true)
+  @objc public func setUserExtension(userExtension: Swift.String)
+  @objc public func setCallExtension(callExtension: Swift.String)
+  @objc override dynamic public init()
+  @objc deinit
+}
+@_inheritsConvenienceInitializers @objc public class VideoOptions : ObjectiveC.NSObject {
+  public var filterCallerInfo: Swift.Bool
+  @objc public var allowBeauty: Swift.Bool
+  @objc public var allowEvaluate: Swift.Bool
+  @objc public var allowAddMember: Swift.Bool
+  @objc public var allowMulti: Swift.Bool
+  public var mCallExtension: Swift.String
+  @objc public var isShowDocInfo: Swift.Bool
+  @objc public var enableCloseCamera: Swift.Bool
+  @objc public var isCloseCameraCall: Swift.Bool
+  @objc override dynamic public init()
+  @objc deinit
+}
+@_inheritsConvenienceInitializers @objc public class MessageOptions : ObjectiveC.NSObject {
+  @objc public var isByPresent: Swift.Bool
+  @objc public var isFilterSummary: Swift.Bool
+  @objc public var isFilterMedicinal: Swift.Bool
+  @objc public var defaultDocHeader: Swift.String
+  @objc public var defaultDocName: Swift.String
+  @objc public var messageTitle: Swift.String
+  @objc override dynamic public init()
+  @objc deinit
+}
+@_inheritsConvenienceInitializers @objc public class UsercenterOptions : ObjectiveC.NSObject {
+  @objc public var enableVipInfo: Swift.Bool
+  @objc public var hideUserCenter: Swift.Bool
+  @objc public var enableActivate: Swift.Bool
+  @objc public var enableMedical: Swift.Bool
+  @objc public var enableAddMemberInDoc: Swift.Bool
+  @objc public var enableBuyService: Swift.Bool
+  @objc override dynamic public init()
+  @objc deinit
+}
+@_hasMissingDesignatedInitializers public class DrantStatics {
+  public static let `default`: DDoctorSDK.DrantStatics
+  public func send(params: [Swift.String : Any])
+  @objc deinit
+}
+public struct DrantStaticsConfig : DDoctorSDK.SDKRequest {
+  public func serviceURLSuffix() -> Swift.String
+  public func requestMethod() -> DDoctorSDK.DrantRequestMethod
+  public func needDNS() -> Swift.Bool
+  public func needEncrypt() -> Swift.Bool
+  public func extensionUrlHost() -> Swift.String?
+  public func loadAppVersion() -> Swift.Bool
+}
+@_hasMissingDesignatedInitializers public class DrantUrl {
+  public static func makeUrl(_ url: Swift.String) -> Swift.String
+  @objc deinit
+}
+@_hasMissingDesignatedInitializers public class UrlParams {
+  public static func addCommon(_ param: [Swift.String : Any]?) -> [Swift.String : Any]
+  public static func param2String(param: [Swift.String : Any]? = nil) -> Swift.String
+  @objc deinit
+}
+@_hasMissingDesignatedInitializers public class DrantUserDefaults {
+  public class func setString(_ str: Swift.String, key: Swift.String)
+  public class func stringValue(_ key: Swift.String) -> Swift.String?
+  public class func setArray(_ array: [Swift.AnyObject], key: Swift.String)
+  public class func arrayForKey(_ key: Swift.String) -> [Swift.AnyObject]?
+  public class func setImage(_ image: UIKit.UIImage, key: Swift.String)
+  public class func imageForKey(_ key: Swift.String) -> UIKit.UIImage?
+  @objc deinit
+}
+extension DrantUserDefaults {
+  public class func setBool(_ flag: Swift.Bool, key: Swift.String)
+  public class func boolForKey(_ key: Swift.String) -> Swift.Bool
+  public class func setObject(_ obj: Swift.AnyObject, key: Swift.String)
+  public class func objectForKey(_ key: Swift.String) -> Swift.AnyObject?
+  public class func removeObject(_ key: Swift.String)
+}
+extension DrantUserDefaults {
+  public class func setData(_ data: Foundation.Data?, key: Swift.String)
+  public class func dataForKey(_ key: Swift.String) -> Foundation.Data?
+  public class func userDefaults() -> Foundation.UserDefaults
+  public class func synchronize()
+  public class func encryptkey(_ key: Swift.String) -> Swift.String
+}
+@_hasMissingDesignatedInitializers public class DrantUserModel : DDoctorSDK.Mappable {
+  public var product: DDoctorSDK.DrantMemberInfoModel?
+  public var uuid: Swift.Int?
+  public var isMember: Swift.Bool?
+  required public init?(map: DDoctorSDK.Map)
+  public func mapping(map: DDoctorSDK.Map)
+  @objc deinit
+}
+public struct DrantMemberInfoModel : DDoctorSDK.Mappable {
+  public var productServiceId: Swift.Int?
+  public var productStatusDescn: Swift.String?
+  public init?(map: DDoctorSDK.Map)
+  public mutating func mapping(map: DDoctorSDK.Map)
+}
+open class DrantValueObservable<T> {
+  public typealias Observer = (T) -> Swift.Void
+  open var observer: DDoctorSDK.DrantValueObservable<T>.Observer?
+  open func observe(_ observer: DDoctorSDK.DrantValueObservable<T>.Observer?)
+  open var value: T {
+    get
+    set
+  }
+  public init(_ v: T)
+  @objc deinit
+}
+@objc public enum DrantCallingState : Swift.Int {
+  case onStart = 0
+  case waitingDoctor
+  case callFreeDoctor
+  case callConnect
+  case didRing
+  public init?(rawValue: Swift.Int)
+  public typealias RawValue = Swift.Int
+  public var rawValue: Swift.Int {
+    get
+  }
+}
+@objc public protocol DrantVideoDelegate : ObjectiveC.NSObjectProtocol {
+  @objc optional func callStateChange(_ state: DDoctorSDK.DrantCallingState)
+  @objc optional func onStart(orderId: Swift.String?)
+  @objc optional func callDidEstablish()
+  @objc optional func getChatParentView(_ view: UIKit.UIView)
+  @objc optional func onFail(_ errorCode: Swift.Int, errrorStr: Swift.String?)
+  @objc optional func onCancel()
+  @objc optional func callDidFinish()
+  @objc optional func onExtensionDoctor()
+  @objc optional func onReceive(_ callID: Swift.String)
+  @objc optional func onResponse(_ accept: Swift.Bool)
+  @objc optional func onForceOffline()
+}
+public struct ECB : DDoctorSDK.BlockMode {
+  public let options: DDoctorSDK.BlockModeOption
+  public let customBlockSize: Swift.Int?
+  public init()
+  public func worker(blockSize: Swift.Int, cipherOperation: @escaping DDoctorSDK.CipherOperationOnBlock, encryptionOperation: @escaping DDoctorSDK.CipherOperationOnBlock) throws -> DDoctorSDK.CipherModeWorker
+}
+@objc public protocol FloatRatingViewDelegate {
+  @objc func floatRatingView(_ ratingView: DDoctorSDK.FloatRatingView, didUpdate rating: Swift.Float)
+  @objc optional func floatRatingView(_ ratingView: DDoctorSDK.FloatRatingView, isUpdating rating: Swift.Float)
+}
+@objc @_inheritsConvenienceInitializers @IBDesignable open class FloatRatingView : UIKit.UIView {
+  weak open var delegate: DDoctorSDK.FloatRatingViewDelegate?
+  @objc @IBInspectable open var emptyImage: UIKit.UIImage? {
+    @objc get
+    @objc set
+  }
+  @objc @IBInspectable open var fullImage: UIKit.UIImage? {
+    @objc get
+    @objc set
+  }
+  @objc @IBInspectable open var minRating: Swift.Int {
+    @objc get
+    @objc set
+  }
+  @objc @IBInspectable open var maxRating: Swift.Int {
+    @objc get
+    @objc set
+  }
+  @objc @IBInspectable open var minImageSize: CoreGraphics.CGSize
+  @objc @IBInspectable open var rating: Swift.Float {
+    @objc get
+    @objc set
+  }
+  @objc @IBInspectable open var editable: Swift.Bool
+  @objc @IBInspectable open var halfRatings: Swift.Bool
+  @objc @IBInspectable open var floatRatings: Swift.Bool
+  @objc required override dynamic public init(frame: CoreGraphics.CGRect)
+  @objc required dynamic public init?(coder aDecoder: Foundation.NSCoder)
+  @objc override dynamic open func layoutSubviews()
+  @objc override dynamic open func touchesBegan(_ touches: Swift.Set<UIKit.UITouch>, with event: UIKit.UIEvent?)
+  @objc override dynamic open func touchesMoved(_ touches: Swift.Set<UIKit.UITouch>, with event: UIKit.UIEvent?)
+  @objc override dynamic open func touchesEnded(_ touches: Swift.Set<UIKit.UITouch>, with event: UIKit.UIEvent?)
+  @objc deinit
+}
+final public class GCM : DDoctorSDK.BlockMode {
+  public enum Mode {
+    case combined
+    case detached
+    public static func == (a: DDoctorSDK.GCM.Mode, b: DDoctorSDK.GCM.Mode) -> Swift.Bool
+    public func hash(into hasher: inout Swift.Hasher)
+    public var hashValue: Swift.Int {
+      get
+    }
+  }
+  final public let options: DDoctorSDK.BlockModeOption
+  public enum Error : Swift.Error {
+    case invalidInitializationVector
+    case fail
+    public static func == (a: DDoctorSDK.GCM.Error, b: DDoctorSDK.GCM.Error) -> Swift.Bool
+    public func hash(into hasher: inout Swift.Hasher)
+    public var hashValue: Swift.Int {
+      get
+    }
+  }
+  final public let customBlockSize: Swift.Int?
+  final public var authenticationTag: Swift.Array<Swift.UInt8>?
+  public init(iv: Swift.Array<Swift.UInt8>, additionalAuthenticatedData: Swift.Array<Swift.UInt8>? = nil, tagLength: Swift.Int = 16, mode: DDoctorSDK.GCM.Mode = .detached)
+  convenience public init(iv: Swift.Array<Swift.UInt8>, authenticationTag: Swift.Array<Swift.UInt8>, additionalAuthenticatedData: Swift.Array<Swift.UInt8>? = nil, mode: DDoctorSDK.GCM.Mode = .detached)
+  final public func worker(blockSize: Swift.Int, cipherOperation: @escaping DDoctorSDK.CipherOperationOnBlock, encryptionOperation: @escaping DDoctorSDK.CipherOperationOnBlock) throws -> DDoctorSDK.CipherModeWorker
+  @objc deinit
+}
+@_specialize(exported: false, kind: full, where T == Swift.Int)
+@_specialize(exported: false, kind: full, where T == Swift.UInt)
+@_specialize(exported: false, kind: full, where T == Swift.UInt8)
+@_specialize(exported: false, kind: full, where T == Swift.UInt16)
+@_specialize(exported: false, kind: full, where T == Swift.UInt32)
+@_specialize(exported: false, kind: full, where T == Swift.UInt64)
+@inlinable internal func arrayOfBytes<T>(value: T, length totalBytes: Swift.Int = MemoryLayout<T>.size) -> Swift.Array<Swift.UInt8> where T : Swift.FixedWidthInteger {
+  let valuePointer = UnsafeMutablePointer<T>.allocate(capacity: 1)
+  valuePointer.pointee = value
+
+  let bytesPointer = UnsafeMutablePointer<UInt8>(OpaquePointer(valuePointer))
+  var bytes = Array<UInt8>(repeating: 0, count: totalBytes)
+  for j in 0..<min(MemoryLayout<T>.size, totalBytes) {
+    bytes[totalBytes - 1 - j] = (bytesPointer + j).pointee
+  }
+
+  valuePointer.deinitialize(count: 1)
+  valuePointer.deallocate()
+
+  return bytes
+}
+public typealias DrantFetchBlock = (UIKit.UIImage?, [Swift.AnyHashable : Any]?) -> Swift.Void
+public typealias onCanceled = (() -> Swift.Void)
+public typealias onCapFinished = (([DDoctorSDK.DrantCameraImageModel]?) -> Swift.Void)
+public typealias onCropFinish = (UIKit.UIImage, Swift.String?) -> Swift.Void
+public enum DrantMediaType : Swift.Int {
+  case cusCamera
+  case sysCamera
+  case cusVideo
+  case sysVideo
+  case photoImage
+  case photoVideo
+  case cusPhoto
+  case sysCrop
+  public init?(rawValue: Swift.Int)
+  public typealias RawValue = Swift.Int
+  public var rawValue: Swift.Int {
+    get
+  }
+}
+public enum DateFormat : Swift.String {
+  case Full
+  case SingleDate
+  case Single
+  case WithoutSecond
+  case WithoutYearAndSecond
+  case HourMinute
+  case CN_Month_Day
+  case CN_Hour_Minute
+  public init?(rawValue: Swift.String)
+  public typealias RawValue = Swift.String
+  public var rawValue: Swift.String {
+    get
+  }
+}
+@objc @_inheritsConvenienceInitializers public class DrantDateUtils : ObjectiveC.NSObject {
+  public class func getDateForChinaStr() -> Swift.String
+  public static func stringWithDurationFromSeconds(_ seconds: Foundation.TimeInterval) -> Swift.String
+  public static func component(_ date: Foundation.Date) -> Foundation.DateComponents
+  @objc override dynamic public init()
+  @objc deinit
+}
+extension DrantDateUtils {
+  public class func date2String(_ date: Foundation.Date, format: Swift.String) -> Swift.String
+  public class func date2String(_ date: Foundation.Date, format: DDoctorSDK.DateFormat) -> Swift.String
+}
+extension DrantDateUtils {
+  public class func string2Date(_ str: Swift.String, format: DDoctorSDK.DateFormat) -> Foundation.Date?
+  public class func string2Date(_ str: Swift.String, format: Swift.String) -> Foundation.Date?
+}
+extension DrantDateUtils {
+  public static func dateStringFromNow(_ date: Swift.Int) -> Swift.String
+  public static func dateStringFromInt(_ date: Swift.Int) -> Swift.String
+  public static func dateYearStringFromInt(_ date: Swift.Int) -> Swift.String
+}
+@_inheritsConvenienceInitializers @objc public class DrantCallerInfo : ObjectiveC.NSObject, DDoctorSDK.Mappable {
+  public var name: Swift.String?
+  public var photourl: Swift.String?
+  public var uuid: Swift.Int?
+  public var userToken: Swift.String?
+  @objc override dynamic public init()
+  required public init?(map: DDoctorSDK.Map)
+  public func mapping(map: DDoctorSDK.Map)
+  @objc deinit
+}
+public struct DrantGetQuesetionModel : DDoctorSDK.Mappable {
+  public var question: DDoctorSDK.DrantQuesetionModel?
+  public var rate: [DDoctorSDK.rateModel]?
+  public init?(map: DDoctorSDK.Map)
+  public init()
+  public mutating func mapping(map: DDoctorSDK.Map)
+  public func isHaveQ() -> Swift.Bool
+}
+public struct DrantQuesetionModel : DDoctorSDK.Mappable {
+  public var answerOne: Swift.String?
+  public var answerTwo: Swift.String?
+  public var content: Swift.String?
+  public var id: Swift.Int?
+  public init?(map: DDoctorSDK.Map)
+  public mutating func mapping(map: DDoctorSDK.Map)
+}
+public struct rateModel : DDoctorSDK.Mappable {
+  public var createTime: Swift.Int?
+  public var content: Swift.String?
+  public var state: Swift.Int?
+  public var id: Swift.Int?
+  public var answerOne: Swift.String?
+  public init?(map: DDoctorSDK.Map)
+  public mutating func mapping(map: DDoctorSDK.Map)
+}
+@objc public enum DrantCallType : Swift.Int {
+  case child = 600000
+  case adult = 600002
+  public init?(rawValue: Swift.Int)
+  public typealias RawValue = Swift.Int
+  public var rawValue: Swift.Int {
+    get
+  }
+}
+public typealias DrantNetError = ((Swift.String) -> (Swift.Void))
+public typealias DrantNetSuccessNoData = () -> Swift.Void
+public typealias NetResult = (Swift.Bool, Swift.String) -> (Swift.Void)
+public enum DrantRequestMethod {
+  case get
+  case post
+  public static func == (a: DDoctorSDK.DrantRequestMethod, b: DDoctorSDK.DrantRequestMethod) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+public enum DrantServerType {
+  case pay
+  case pacs
+  case weixin
+  case uploadLog
+  public static func == (a: DDoctorSDK.DrantServerType, b: DDoctorSDK.DrantServerType) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+public struct DrantRequestData {
+  public init(body: [Swift.String : Any] = ["default_sw":"default"], param: [Swift.String : Any] = ["default_sw":"default"])
+  public var mHttpBody: [Swift.String : Any]
+  public var mParameters: [Swift.String : Any]
+}
+extension UIControl.State : Swift.Hashable {
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+@objc public enum DrantPagerViewTransformerType : Swift.Int {
+  case crossFading
+  case zoomOut
+  case depth
+  case overlap
+  case linear
+  case coverFlow
+  case ferrisWheel
+  case invertedFerrisWheel
+  case cubic
+  public init?(rawValue: Swift.Int)
+  public typealias RawValue = Swift.Int
+  public var rawValue: Swift.Int {
+    get
+  }
+}
+extension DrantRequest {
+  public func startForArray(_ successCallBack: @escaping DDoctorSDK.DrantRequest<T>.DrantNetSuccessForArray, failCallBack: @escaping DDoctorSDK.DrantNetError)
+}
+public struct HKDF {
+  public enum Error : Swift.Error {
+    case invalidInput
+    case derivedKeyTooLong
+    public static func == (a: DDoctorSDK.HKDF.Error, b: DDoctorSDK.HKDF.Error) -> Swift.Bool
+    public func hash(into hasher: inout Swift.Hasher)
+    public var hashValue: Swift.Int {
+      get
+    }
+  }
+  public init(password: Swift.Array<Swift.UInt8>, salt: Swift.Array<Swift.UInt8>? = nil, info: Swift.Array<Swift.UInt8>? = nil, keyLength: Swift.Int? = nil, variant: DDoctorSDK.HMAC.Variant = .sha256) throws
+  public func calculate() throws -> Swift.Array<Swift.UInt8>
+}
+extension HMAC {
+  convenience public init(key: Swift.String, variant: DDoctorSDK.HMAC.Variant = .md5) throws
+}
+final public class HMAC : DDoctorSDK.Authenticator {
+  public enum Error : Swift.Error {
+    case authenticateError
+    case invalidInput
+    public static func == (a: DDoctorSDK.HMAC.Error, b: DDoctorSDK.HMAC.Error) -> Swift.Bool
+    public func hash(into hasher: inout Swift.Hasher)
+    public var hashValue: Swift.Int {
+      get
+    }
+  }
+  public enum Variant {
+    case sha1, sha256, sha384, sha512, md5
+    public static func == (a: DDoctorSDK.HMAC.Variant, b: DDoctorSDK.HMAC.Variant) -> Swift.Bool
+    public func hash(into hasher: inout Swift.Hasher)
+    public var hashValue: Swift.Int {
+      get
+    }
+  }
+  public init(key: Swift.Array<Swift.UInt8>, variant: DDoctorSDK.HMAC.Variant = .md5)
+  final public func authenticate(_ bytes: Swift.Array<Swift.UInt8>) throws -> Swift.Array<Swift.UInt8>
+  @objc deinit
+}
+extension FixedWidthInteger {
+  @inlinable internal func bytes(totalBytes: Swift.Int = MemoryLayout<Self>.size) -> Swift.Array<Swift.UInt8> {
+    arrayOfBytes(value: self.littleEndian, length: totalBytes)
+    // TODO: adjust bytes order
+    // var value = self.littleEndian
+    // return withUnsafeBytes(of: &value, Array.init).reversed()
+  }
+}
+public let KeychainAccessErrorDomain: Swift.String
+public enum ItemClass {
+  case genericPassword
+  case internetPassword
+}
+public enum ProtocolType {
+  case ftp
+  case ftpAccount
+  case http
+  case irc
+  case nntp
+  case pop3
+  case smtp
+  case socks
+  case imap
+  case ldap
+  case appleTalk
+  case afp
+  case telnet
+  case ssh
+  case ftps
+  case https
+  case httpProxy
+  case httpsProxy
+  case ftpProxy
+  case smb
+  case rtsp
+  case rtspProxy
+  case daap
+  case eppc
+  case ipp
+  case nntps
+  case ldaps
+  case telnetS
+  case imaps
+  case ircs
+  case pop3S
+}
+public enum AuthenticationType {
+  case ntlm
+  case msn
+  case dpa
+  case rpa
+  case httpBasic
+  case httpDigest
+  case htmlForm
+  case `default`
+}
+public enum Accessibility {
+  case whenUnlocked
+  case afterFirstUnlock
+  case always
+  @available(iOS 8.0, macOS 10.10, *)
+  case whenPasscodeSetThisDeviceOnly
+  case whenUnlockedThisDeviceOnly
+  case afterFirstUnlockThisDeviceOnly
+  case alwaysThisDeviceOnly
+}
+public struct AuthenticationPolicy : Swift.OptionSet {
+  @available(iOS 8.0, macOS 10.10, *)
+  @available(watchOS, unavailable)
+  public static let userPresence: DDoctorSDK.AuthenticationPolicy
+  @available(iOS 9.0, *)
+  @available(macOS, unavailable)
+  @available(watchOS, unavailable)
+  public static let touchIDAny: DDoctorSDK.AuthenticationPolicy
+  @available(iOS 9.0, *)
+  @available(macOS, unavailable)
+  @available(watchOS, unavailable)
+  public static let touchIDCurrentSet: DDoctorSDK.AuthenticationPolicy
+  @available(iOS 9.0, macOS 10.11, *)
+  @available(watchOS, unavailable)
+  public static let devicePasscode: DDoctorSDK.AuthenticationPolicy
+  @available(iOS 9.0, *)
+  @available(macOS, unavailable)
+  @available(watchOS, unavailable)
+  public static let or: DDoctorSDK.AuthenticationPolicy
+  @available(iOS 9.0, *)
+  @available(macOS, unavailable)
+  @available(watchOS, unavailable)
+  public static let and: DDoctorSDK.AuthenticationPolicy
+  @available(iOS 9.0, *)
+  @available(macOS, unavailable)
+  @available(watchOS, unavailable)
+  public static let privateKeyUsage: DDoctorSDK.AuthenticationPolicy
+  @available(iOS 9.0, *)
+  @available(macOS, unavailable)
+  @available(watchOS, unavailable)
+  public static let applicationPassword: DDoctorSDK.AuthenticationPolicy
+  public let rawValue: Swift.UInt
+  public init(rawValue: Swift.UInt)
+  public typealias ArrayLiteralElement = DDoctorSDK.AuthenticationPolicy
+  public typealias Element = DDoctorSDK.AuthenticationPolicy
+  public typealias RawValue = Swift.UInt
+}
+public struct Attributes {
+  public var `class`: Swift.String? {
+    get
+  }
+  public var data: Foundation.Data? {
+    get
+  }
+  public var ref: Foundation.Data? {
+    get
+  }
+  public var persistentRef: Foundation.Data? {
+    get
+  }
+  public var accessible: Swift.String? {
+    get
+  }
+  public var accessControl: Security.SecAccessControl? {
+    get
+  }
+  public var accessGroup: Swift.String? {
+    get
+  }
+  public var synchronizable: Swift.Bool? {
+    get
+  }
+  public var creationDate: Foundation.Date? {
+    get
+  }
+  public var modificationDate: Foundation.Date? {
+    get
+  }
+  public var attributeDescription: Swift.String? {
+    get
+  }
+  public var comment: Swift.String? {
+    get
+  }
+  public var creator: Swift.String? {
+    get
+  }
+  public var type: Swift.String? {
+    get
+  }
+  public var label: Swift.String? {
+    get
+  }
+  public var isInvisible: Swift.Bool? {
+    get
+  }
+  public var isNegative: Swift.Bool? {
+    get
+  }
+  public var account: Swift.String? {
+    get
+  }
+  public var service: Swift.String? {
+    get
+  }
+  public var generic: Foundation.Data? {
+    get
+  }
+  public var securityDomain: Swift.String? {
+    get
+  }
+  public var server: Swift.String? {
+    get
+  }
+  public var `protocol`: Swift.String? {
+    get
+  }
+  public var authenticationType: Swift.String? {
+    get
+  }
+  public var port: Swift.Int? {
+    get
+  }
+  public var path: Swift.String? {
+    get
+  }
+  public subscript(key: Swift.String) -> Any? {
+    get
+  }
+}
+@_hasMissingDesignatedInitializers final public class Keychain {
+  final public var itemClass: DDoctorSDK.ItemClass {
+    get
+  }
+  final public var service: Swift.String {
+    get
+  }
+  final public var accessGroup: Swift.String? {
+    get
+  }
+  final public var server: Foundation.URL {
+    get
+  }
+  final public var protocolType: DDoctorSDK.ProtocolType {
+    get
+  }
+  final public var authenticationType: DDoctorSDK.AuthenticationType {
+    get
+  }
+  final public var accessibility: DDoctorSDK.Accessibility {
+    get
+  }
+  @available(iOS 8.0, macOS 10.10, *)
+  @available(watchOS, unavailable)
+  final public var authenticationPolicy: DDoctorSDK.AuthenticationPolicy? {
+    get
+  }
+  final public var synchronizable: Swift.Bool {
+    get
+  }
+  final public var label: Swift.String? {
+    get
+  }
+  final public var comment: Swift.String? {
+    get
+  }
+  @available(iOS 8.0, macOS 10.10, *)
+  @available(watchOS, unavailable)
+  final public var authenticationPrompt: Swift.String? {
+    get
+  }
+  @available(iOS 9.0, macOS 10.11, *)
+  final public var authenticationContext: LocalAuthentication.LAContext? {
+    get
+  }
+  convenience public init()
+  convenience public init(service: Swift.String)
+  convenience public init(accessGroup: Swift.String)
+  convenience public init(service: Swift.String, accessGroup: Swift.String)
+  convenience public init(server: Swift.String, protocolType: DDoctorSDK.ProtocolType, authenticationType: DDoctorSDK.AuthenticationType = .default)
+  convenience public init(server: Foundation.URL, protocolType: DDoctorSDK.ProtocolType, authenticationType: DDoctorSDK.AuthenticationType = .default)
+  final public func accessibility(_ accessibility: DDoctorSDK.Accessibility) -> DDoctorSDK.Keychain
+  @available(iOS 8.0, macOS 10.10, *)
+  @available(watchOS, unavailable)
+  final public func accessibility(_ accessibility: DDoctorSDK.Accessibility, authenticationPolicy: DDoctorSDK.AuthenticationPolicy) -> DDoctorSDK.Keychain
+  final public func synchronizable(_ synchronizable: Swift.Bool) -> DDoctorSDK.Keychain
+  final public func label(_ label: Swift.String) -> DDoctorSDK.Keychain
+  final public func comment(_ comment: Swift.String) -> DDoctorSDK.Keychain
+  final public func attributes(_ attributes: [Swift.String : Any]) -> DDoctorSDK.Keychain
+  @available(iOS 8.0, macOS 10.10, *)
+  @available(watchOS, unavailable)
+  final public func authenticationPrompt(_ authenticationPrompt: Swift.String) -> DDoctorSDK.Keychain
+  @available(iOS 9.0, macOS 10.11, *)
+  final public func authenticationContext(_ authenticationContext: LocalAuthentication.LAContext) -> DDoctorSDK.Keychain
+  final public func get(_ key: Swift.String) throws -> Swift.String?
+  final public func getString(_ key: Swift.String) throws -> Swift.String?
+  final public func getData(_ key: Swift.String) throws -> Foundation.Data?
+  final public func get<T>(_ key: Swift.String, handler: (DDoctorSDK.Attributes?) -> T) throws -> T
+  final public func set(_ value: Swift.String, key: Swift.String) throws
+  final public func set(_ value: Foundation.Data, key: Swift.String) throws
+  final public subscript(key: Swift.String) -> Swift.String? {
+    get
+    set
+  }
+  final public subscript(string key: Swift.String) -> Swift.String? {
+    get
+    set
+  }
+  final public subscript(data key: Swift.String) -> Foundation.Data? {
+    get
+    set
+  }
+  final public subscript(attributes key: Swift.String) -> DDoctorSDK.Attributes? {
+    get
+  }
+  final public func remove(_ key: Swift.String) throws
+  final public func removeAll() throws
+  final public func contains(_ key: Swift.String) throws -> Swift.Bool
+  final public class func allKeys(_ itemClass: DDoctorSDK.ItemClass) -> [(Swift.String, Swift.String)]
+  final public func allKeys() -> [Swift.String]
+  final public class func allItems(_ itemClass: DDoctorSDK.ItemClass) -> [[Swift.String : Any]]
+  final public func allItems() -> [[Swift.String : Any]]
+  @available(iOS 8.0, *)
+  final public func getSharedPassword(_ completion: @escaping (Swift.String?, Swift.String?, Swift.Error?) -> () = { account, password, error -> () in })
+  @available(iOS 8.0, *)
+  final public func getSharedPassword(_ account: Swift.String, completion: @escaping (Swift.String?, Swift.Error?) -> () = { password, error -> () in })
+  @available(iOS 8.0, *)
+  final public func setSharedPassword(_ password: Swift.String, account: Swift.String, completion: @escaping (Swift.Error?) -> () = { e -> () in })
+  @available(iOS 8.0, *)
+  final public func removeSharedPassword(_ account: Swift.String, completion: @escaping (Swift.Error?) -> () = { e -> () in })
+  @available(iOS 8.0, *)
+  final public class func requestSharedWebCredential(_ completion: @escaping ([[Swift.String : Swift.String]], Swift.Error?) -> () = { credentials, error -> () in })
+  @available(iOS 8.0, *)
+  final public class func requestSharedWebCredential(domain: Swift.String, completion: @escaping ([[Swift.String : Swift.String]], Swift.Error?) -> () = { credentials, error -> () in })
+  @available(iOS 8.0, *)
+  final public class func requestSharedWebCredential(domain: Swift.String, account: Swift.String, completion: @escaping ([[Swift.String : Swift.String]], Swift.Error?) -> () = { credentials, error -> () in })
+  @available(iOS 8.0, *)
+  final public class func generatePassword() -> Swift.String
+  @objc deinit
+}
+extension Keychain : Swift.CustomStringConvertible, Swift.CustomDebugStringConvertible {
+  final public var description: Swift.String {
+    get
+  }
+  final public var debugDescription: Swift.String {
+    get
+  }
+}
+extension Attributes : Swift.CustomStringConvertible, Swift.CustomDebugStringConvertible {
+  public var description: Swift.String {
+    get
+  }
+  public var debugDescription: Swift.String {
+    get
+  }
+}
+extension ItemClass : Swift.RawRepresentable, Swift.CustomStringConvertible {
+  public init?(rawValue: Swift.String)
+  public var rawValue: Swift.String {
+    get
+  }
+  public var description: Swift.String {
+    get
+  }
+  public typealias RawValue = Swift.String
+}
+extension ProtocolType : Swift.RawRepresentable, Swift.CustomStringConvertible {
+  public init?(rawValue: Swift.String)
+  public var rawValue: Swift.String {
+    get
+  }
+  public var description: Swift.String {
+    get
+  }
+  public typealias RawValue = Swift.String
+}
+extension AuthenticationType : Swift.RawRepresentable, Swift.CustomStringConvertible {
+  public init?(rawValue: Swift.String)
+  public var rawValue: Swift.String {
+    get
+  }
+  public var description: Swift.String {
+    get
+  }
+  public typealias RawValue = Swift.String
+}
+extension Accessibility : Swift.RawRepresentable, Swift.CustomStringConvertible {
+  public init?(rawValue: Swift.String)
+  public var rawValue: Swift.String {
+    get
+  }
+  public var description: Swift.String {
+    get
+  }
+  public typealias RawValue = Swift.String
+}
+public enum Status : Darwin.OSStatus, Swift.Error {
+  case success
+  case unimplemented
+  case diskFull
+  case io
+  case opWr
+  case param
+  case wrPerm
+  case allocate
+  case userCanceled
+  case badReq
+  case internalComponent
+  case notAvailable
+  case readOnly
+  case authFailed
+  case noSuchKeychain
+  case invalidKeychain
+  case duplicateKeychain
+  case duplicateCallback
+  case invalidCallback
+  case duplicateItem
+  case itemNotFound
+  case bufferTooSmall
+  case dataTooLarge
+  case noSuchAttr
+  case invalidItemRef
+  case invalidSearchRef
+  case noSuchClass
+  case noDefaultKeychain
+  case interactionNotAllowed
+  case readOnlyAttr
+  case wrongSecVersion
+  case keySizeNotAllowed
+  case noStorageModule
+  case noCertificateModule
+  case noPolicyModule
+  case interactionRequired
+  case dataNotAvailable
+  case dataNotModifiable
+  case createChainFailed
+  case invalidPrefsDomain
+  case inDarkWake
+  case aclNotSimple
+  case policyNotFound
+  case invalidTrustSetting
+  case noAccessForItem
+  case invalidOwnerEdit
+  case trustNotAvailable
+  case unsupportedFormat
+  case unknownFormat
+  case keyIsSensitive
+  case multiplePrivKeys
+  case passphraseRequired
+  case invalidPasswordRef
+  case invalidTrustSettings
+  case noTrustSettings
+  case pkcs12VerifyFailure
+  case invalidCertificate
+  case notSigner
+  case policyDenied
+  case invalidKey
+  case decode
+  case `internal`
+  case unsupportedAlgorithm
+  case unsupportedOperation
+  case unsupportedPadding
+  case itemInvalidKey
+  case itemInvalidKeyType
+  case itemInvalidValue
+  case itemClassMissing
+  case itemMatchUnsupported
+  case useItemListUnsupported
+  case useKeychainUnsupported
+  case useKeychainListUnsupported
+  case returnDataUnsupported
+  case returnAttributesUnsupported
+  case returnRefUnsupported
+  case returnPersitentRefUnsupported
+  case valueRefUnsupported
+  case valuePersistentRefUnsupported
+  case returnMissingPointer
+  case matchLimitUnsupported
+  case itemIllegalQuery
+  case waitForCallback
+  case missingEntitlement
+  case upgradePending
+  case mpSignatureInvalid
+  case otrTooOld
+  case otrIDTooNew
+  case serviceNotAvailable
+  case insufficientClientID
+  case deviceReset
+  case deviceFailed
+  case appleAddAppACLSubject
+  case applePublicKeyIncomplete
+  case appleSignatureMismatch
+  case appleInvalidKeyStartDate
+  case appleInvalidKeyEndDate
+  case conversionError
+  case appleSSLv2Rollback
+  case quotaExceeded
+  case fileTooBig
+  case invalidDatabaseBlob
+  case invalidKeyBlob
+  case incompatibleDatabaseBlob
+  case incompatibleKeyBlob
+  case hostNameMismatch
+  case unknownCriticalExtensionFlag
+  case noBasicConstraints
+  case noBasicConstraintsCA
+  case invalidAuthorityKeyID
+  case invalidSubjectKeyID
+  case invalidKeyUsageForPolicy
+  case invalidExtendedKeyUsage
+  case invalidIDLinkage
+  case pathLengthConstraintExceeded
+  case invalidRoot
+  case crlExpired
+  case crlNotValidYet
+  case crlNotFound
+  case crlServerDown
+  case crlBadURI
+  case unknownCertExtension
+  case unknownCRLExtension
+  case crlNotTrusted
+  case crlPolicyFailed
+  case idpFailure
+  case smimeEmailAddressesNotFound
+  case smimeBadExtendedKeyUsage
+  case smimeBadKeyUsage
+  case smimeKeyUsageNotCritical
+  case smimeNoEmailAddress
+  case smimeSubjAltNameNotCritical
+  case sslBadExtendedKeyUsage
+  case ocspBadResponse
+  case ocspBadRequest
+  case ocspUnavailable
+  case ocspStatusUnrecognized
+  case endOfData
+  case incompleteCertRevocationCheck
+  case networkFailure
+  case ocspNotTrustedToAnchor
+  case recordModified
+  case ocspSignatureError
+  case ocspNoSigner
+  case ocspResponderMalformedReq
+  case ocspResponderInternalError
+  case ocspResponderTryLater
+  case ocspResponderSignatureRequired
+  case ocspResponderUnauthorized
+  case ocspResponseNonceMismatch
+  case codeSigningBadCertChainLength
+  case codeSigningNoBasicConstraints
+  case codeSigningBadPathLengthConstraint
+  case codeSigningNoExtendedKeyUsage
+  case codeSigningDevelopment
+  case resourceSignBadCertChainLength
+  case resourceSignBadExtKeyUsage
+  case trustSettingDeny
+  case invalidSubjectName
+  case unknownQualifiedCertStatement
+  case mobileMeRequestQueued
+  case mobileMeRequestRedirected
+  case mobileMeServerError
+  case mobileMeServerNotAvailable
+  case mobileMeServerAlreadyExists
+  case mobileMeServerServiceErr
+  case mobileMeRequestAlreadyPending
+  case mobileMeNoRequestPending
+  case mobileMeCSRVerifyFailure
+  case mobileMeFailedConsistencyCheck
+  case notInitialized
+  case invalidHandleUsage
+  case pvcReferentNotFound
+  case functionIntegrityFail
+  case internalError
+  case memoryError
+  case invalidData
+  case mdsError
+  case invalidPointer
+  case selfCheckFailed
+  case functionFailed
+  case moduleManifestVerifyFailed
+  case invalidGUID
+  case invalidHandle
+  case invalidDBList
+  case invalidPassthroughID
+  case invalidNetworkAddress
+  case crlAlreadySigned
+  case invalidNumberOfFields
+  case verificationFailure
+  case unknownTag
+  case invalidSignature
+  case invalidName
+  case invalidCertificateRef
+  case invalidCertificateGroup
+  case tagNotFound
+  case invalidQuery
+  case invalidValue
+  case callbackFailed
+  case aclDeleteFailed
+  case aclReplaceFailed
+  case aclAddFailed
+  case aclChangeFailed
+  case invalidAccessCredentials
+  case invalidRecord
+  case invalidACL
+  case invalidSampleValue
+  case incompatibleVersion
+  case privilegeNotGranted
+  case invalidScope
+  case pvcAlreadyConfigured
+  case invalidPVC
+  case emmLoadFailed
+  case emmUnloadFailed
+  case addinLoadFailed
+  case invalidKeyRef
+  case invalidKeyHierarchy
+  case addinUnloadFailed
+  case libraryReferenceNotFound
+  case invalidAddinFunctionTable
+  case invalidServiceMask
+  case moduleNotLoaded
+  case invalidSubServiceID
+  case attributeNotInContext
+  case moduleManagerInitializeFailed
+  case moduleManagerNotFound
+  case eventNotificationCallbackNotFound
+  case inputLengthError
+  case outputLengthError
+  case privilegeNotSupported
+  case deviceError
+  case attachHandleBusy
+  case notLoggedIn
+  case algorithmMismatch
+  case keyUsageIncorrect
+  case keyBlobTypeIncorrect
+  case keyHeaderInconsistent
+  case unsupportedKeyFormat
+  case unsupportedKeySize
+  case invalidKeyUsageMask
+  case unsupportedKeyUsageMask
+  case invalidKeyAttributeMask
+  case unsupportedKeyAttributeMask
+  case invalidKeyLabel
+  case unsupportedKeyLabel
+  case invalidKeyFormat
+  case unsupportedVectorOfBuffers
+  case invalidInputVector
+  case invalidOutputVector
+  case invalidContext
+  case invalidAlgorithm
+  case invalidAttributeKey
+  case missingAttributeKey
+  case invalidAttributeInitVector
+  case missingAttributeInitVector
+  case invalidAttributeSalt
+  case missingAttributeSalt
+  case invalidAttributePadding
+  case missingAttributePadding
+  case invalidAttributeRandom
+  case missingAttributeRandom
+  case invalidAttributeSeed
+  case missingAttributeSeed
+  case invalidAttributePassphrase
+  case missingAttributePassphrase
+  case invalidAttributeKeyLength
+  case missingAttributeKeyLength
+  case invalidAttributeBlockSize
+  case missingAttributeBlockSize
+  case invalidAttributeOutputSize
+  case missingAttributeOutputSize
+  case invalidAttributeRounds
+  case missingAttributeRounds
+  case invalidAlgorithmParms
+  case missingAlgorithmParms
+  case invalidAttributeLabel
+  case missingAttributeLabel
+  case invalidAttributeKeyType
+  case missingAttributeKeyType
+  case invalidAttributeMode
+  case missingAttributeMode
+  case invalidAttributeEffectiveBits
+  case missingAttributeEffectiveBits
+  case invalidAttributeStartDate
+  case missingAttributeStartDate
+  case invalidAttributeEndDate
+  case missingAttributeEndDate
+  case invalidAttributeVersion
+  case missingAttributeVersion
+  case invalidAttributePrime
+  case missingAttributePrime
+  case invalidAttributeBase
+  case missingAttributeBase
+  case invalidAttributeSubprime
+  case missingAttributeSubprime
+  case invalidAttributeIterationCount
+  case missingAttributeIterationCount
+  case invalidAttributeDLDBHandle
+  case missingAttributeDLDBHandle
+  case invalidAttributeAccessCredentials
+  case missingAttributeAccessCredentials
+  case invalidAttributePublicKeyFormat
+  case missingAttributePublicKeyFormat
+  case invalidAttributePrivateKeyFormat
+  case missingAttributePrivateKeyFormat
+  case invalidAttributeSymmetricKeyFormat
+  case missingAttributeSymmetricKeyFormat
+  case invalidAttributeWrappedKeyFormat
+  case missingAttributeWrappedKeyFormat
+  case stagedOperationInProgress
+  case stagedOperationNotStarted
+  case verifyFailed
+  case querySizeUnknown
+  case blockSizeMismatch
+  case publicKeyInconsistent
+  case deviceVerifyFailed
+  case invalidLoginName
+  case alreadyLoggedIn
+  case invalidDigestAlgorithm
+  case invalidCRLGroup
+  case certificateCannotOperate
+  case certificateExpired
+  case certificateNotValidYet
+  case certificateRevoked
+  case certificateSuspended
+  case insufficientCredentials
+  case invalidAction
+  case invalidAuthority
+  case verifyActionFailed
+  case invalidCertAuthority
+  case invaldCRLAuthority
+  case invalidCRLEncoding
+  case invalidCRLType
+  case invalidCRL
+  case invalidFormType
+  case invalidID
+  case invalidIdentifier
+  case invalidIndex
+  case invalidPolicyIdentifiers
+  case invalidTimeString
+  case invalidReason
+  case invalidRequestInputs
+  case invalidResponseVector
+  case invalidStopOnPolicy
+  case invalidTuple
+  case multipleValuesUnsupported
+  case notTrusted
+  case noDefaultAuthority
+  case rejectedForm
+  case requestLost
+  case requestRejected
+  case unsupportedAddressType
+  case unsupportedService
+  case invalidTupleGroup
+  case invalidBaseACLs
+  case invalidTupleCredendtials
+  case invalidEncoding
+  case invalidValidityPeriod
+  case invalidRequestor
+  case requestDescriptor
+  case invalidBundleInfo
+  case invalidCRLIndex
+  case noFieldValues
+  case unsupportedFieldFormat
+  case unsupportedIndexInfo
+  case unsupportedLocality
+  case unsupportedNumAttributes
+  case unsupportedNumIndexes
+  case unsupportedNumRecordTypes
+  case fieldSpecifiedMultiple
+  case incompatibleFieldFormat
+  case invalidParsingModule
+  case databaseLocked
+  case datastoreIsOpen
+  case missingValue
+  case unsupportedQueryLimits
+  case unsupportedNumSelectionPreds
+  case unsupportedOperator
+  case invalidDBLocation
+  case invalidAccessRequest
+  case invalidIndexInfo
+  case invalidNewOwner
+  case invalidModifyMode
+  case missingRequiredExtension
+  case extendedKeyUsageNotCritical
+  case timestampMissing
+  case timestampInvalid
+  case timestampNotTrusted
+  case timestampServiceNotAvailable
+  case timestampBadAlg
+  case timestampBadRequest
+  case timestampBadDataFormat
+  case timestampTimeNotAvailable
+  case timestampUnacceptedPolicy
+  case timestampUnacceptedExtension
+  case timestampAddInfoNotAvailable
+  case timestampSystemFailure
+  case signingTimeMissing
+  case timestampRejection
+  case timestampWaiting
+  case timestampRevocationWarning
+  case timestampRevocationNotification
+  case unexpectedError
+}
+extension Status : Swift.RawRepresentable, Swift.CustomStringConvertible {
+  public init(status: Darwin.OSStatus)
+  public var description: Swift.String {
+    get
+  }
+  public init?(rawValue: Darwin.OSStatus)
+  public typealias RawValue = Darwin.OSStatus
+  public var rawValue: Darwin.OSStatus {
+    get
+  }
+}
+extension Status : Foundation.CustomNSError {
+  public static let errorDomain: Swift.String
+  public var errorCode: Swift.Int {
+    get
+  }
+  public var errorUserInfo: [Swift.String : Any] {
+    get
+  }
+}
+@_hasMissingDesignatedInitializers public class LoginManager {
+  public static let `default`: DDoctorSDK.LoginManager
+  public var mUUID: Swift.Int?
+  public func userName() -> Swift.String
+  public func convert2Model() -> Swift.String?
+  public func getUserInfo() -> DDoctorSDK.DrantUserModel?
+  public func hasLoginData() -> Swift.Bool
+  public func getUserInfo(token: Swift.String, success: ((Swift.String?) -> Swift.Void)? = nil, fail: ((Swift.String) -> Swift.Void)? = nil)
+  public func getUserInfoRequest(success: ((Swift.String?) -> Swift.Void)? = nil, fail: ((Swift.String) -> Swift.Void)? = nil)
+  @objc deinit
+}
+public protocol MapContext {
+}
+@_hasMissingDesignatedInitializers final public class Map {
+  final public subscript(key: Swift.String) -> DDoctorSDK.Map {
+    get
+  }
+  final public subscript(key: Swift.String, delimiter delimiter: Swift.String) -> DDoctorSDK.Map {
+    get
+  }
+  final public subscript(key: Swift.String, nested nested: Swift.Bool) -> DDoctorSDK.Map {
+    get
+  }
+  final public subscript(key: Swift.String, nested nested: Swift.Bool, delimiter delimiter: Swift.String) -> DDoctorSDK.Map {
+    get
+  }
+  final public subscript(key: Swift.String, ignoreNil ignoreNil: Swift.Bool) -> DDoctorSDK.Map {
+    get
+  }
+  final public subscript(key: Swift.String, delimiter delimiter: Swift.String, ignoreNil ignoreNil: Swift.Bool) -> DDoctorSDK.Map {
+    get
+  }
+  final public subscript(key: Swift.String, nested nested: Swift.Bool, ignoreNil ignoreNil: Swift.Bool) -> DDoctorSDK.Map {
+    get
+  }
+  final public subscript(key: Swift.String, nested nested: Swift.Bool?, delimiter delimiter: Swift.String, ignoreNil ignoreNil: Swift.Bool) -> DDoctorSDK.Map {
+    get
+  }
+  @objc deinit
+}
+public protocol BaseMappable {
+  mutating func mapping(map: DDoctorSDK.Map)
+}
+public protocol Mappable : DDoctorSDK.BaseMappable {
+  init?(map: DDoctorSDK.Map)
+}
+final public class Mapper<N> where N : DDoctorSDK.BaseMappable {
+  final public var context: DDoctorSDK.MapContext?
+  final public var shouldIncludeNilValues: Swift.Bool
+  public init(context: DDoctorSDK.MapContext? = nil, shouldIncludeNilValues: Swift.Bool = false)
+  final public func map(JSONObject: Any?, toObject object: N) -> N
+  final public func map(JSONString: Swift.String, toObject object: N) -> N
+  final public func map(JSON: [Swift.String : Any], toObject object: N) -> N
+  final public func map(JSONString: Swift.String) -> N?
+  final public func map(JSONObject: Any?) -> N?
+  final public func map(JSON: [Swift.String : Any]) -> N?
+  final public func mapArray(JSONString: Swift.String) -> [N]?
+  final public func mapArray(JSONObject: Any?) -> [N]?
+  final public func mapArray(JSONArray: [[Swift.String : Any]]) -> [N]
+  final public func mapDictionary(JSONString: Swift.String) -> [Swift.String : N]?
+  final public func mapDictionary(JSONObject: Any?) -> [Swift.String : N]?
+  final public func mapDictionary(JSON: [Swift.String : [Swift.String : Any]]) -> [Swift.String : N]?
+  final public func mapDictionary(JSONObject: Any?, toDictionary dictionary: [Swift.String : N]) -> [Swift.String : N]
+  final public func mapDictionary(JSON: [Swift.String : [Swift.String : Any]], toDictionary dictionary: [Swift.String : N]) -> [Swift.String : N]
+  final public func mapDictionaryOfArrays(JSONObject: Any?) -> [Swift.String : [N]]?
+  final public func mapDictionaryOfArrays(JSON: [Swift.String : [[Swift.String : Any]]]) -> [Swift.String : [N]]?
+  final public func mapArrayOfArrays(JSONObject: Any?) -> [[N]]?
+  public static func parseJSONStringIntoDictionary(JSONString: Swift.String) -> [Swift.String : Any]?
+  public static func parseJSONString(JSONString: Swift.String) -> Any?
+  @objc deinit
+}
+final public class MD5 {
+  public init()
+  final public func calculate(for bytes: Swift.Array<Swift.UInt8>) -> Swift.Array<Swift.UInt8>
+  @objc deinit
+}
+extension MD5 : DDoctorSDK.Updatable {
+  final public func update(withBytes bytes: Swift.ArraySlice<Swift.UInt8>, isLast: Swift.Bool = false) throws -> Swift.Array<Swift.UInt8>
+}
+public protocol SDKRequest : DDoctorSDK.DrantRequestConfig {
+}
+final public class OCB : DDoctorSDK.BlockMode {
+  public enum Mode {
+    case combined
+    case detached
+    public static func == (a: DDoctorSDK.OCB.Mode, b: DDoctorSDK.OCB.Mode) -> Swift.Bool
+    public func hash(into hasher: inout Swift.Hasher)
+    public var hashValue: Swift.Int {
+      get
+    }
+  }
+  final public let options: DDoctorSDK.BlockModeOption
+  public enum Error : Swift.Error {
+    case invalidNonce
+    case fail
+    public static func == (a: DDoctorSDK.OCB.Error, b: DDoctorSDK.OCB.Error) -> Swift.Bool
+    public func hash(into hasher: inout Swift.Hasher)
+    public var hashValue: Swift.Int {
+      get
+    }
+  }
+  final public let customBlockSize: Swift.Int?
+  final public var authenticationTag: Swift.Array<Swift.UInt8>?
+  public init(nonce N: Swift.Array<Swift.UInt8>, additionalAuthenticatedData: Swift.Array<Swift.UInt8>? = nil, tagLength: Swift.Int = 16, mode: DDoctorSDK.OCB.Mode = .detached)
+  @inlinable convenience public init(nonce N: Swift.Array<Swift.UInt8>, authenticationTag: Swift.Array<Swift.UInt8>, additionalAuthenticatedData: Swift.Array<Swift.UInt8>? = nil, mode: DDoctorSDK.OCB.Mode = .detached) {
+    self.init(nonce: N, additionalAuthenticatedData: additionalAuthenticatedData, tagLength: authenticationTag.count, mode: mode)
+    self.authenticationTag = authenticationTag
+  }
+  final public func worker(blockSize: Swift.Int, cipherOperation: @escaping DDoctorSDK.CipherOperationOnBlock, encryptionOperation: @escaping DDoctorSDK.CipherOperationOnBlock) throws -> DDoctorSDK.CipherModeWorker
+  @objc deinit
+}
+public struct OFB : DDoctorSDK.BlockMode {
+  public enum Error : Swift.Error {
+    case invalidInitializationVector
+    public static func == (a: DDoctorSDK.OFB.Error, b: DDoctorSDK.OFB.Error) -> Swift.Bool
+    public func hash(into hasher: inout Swift.Hasher)
+    public var hashValue: Swift.Int {
+      get
+    }
+  }
+  public let options: DDoctorSDK.BlockModeOption
+  public let customBlockSize: Swift.Int?
+  public init(iv: Swift.Array<Swift.UInt8>)
+  public func worker(blockSize: Swift.Int, cipherOperation: @escaping DDoctorSDK.CipherOperationOnBlock, encryptionOperation: @escaping DDoctorSDK.CipherOperationOnBlock) throws -> DDoctorSDK.CipherModeWorker
+}
+infix operator <- : DefaultPrecedence
+infix operator >>> : DefaultPrecedence
+public func <- <T>(left: inout T, right: DDoctorSDK.Map)
+public func >>> <T>(left: T, right: DDoctorSDK.Map)
+public func <- <T>(left: inout T?, right: DDoctorSDK.Map)
+public func >>> <T>(left: T?, right: DDoctorSDK.Map)
+public func <- <T>(left: inout T, right: DDoctorSDK.Map) where T : DDoctorSDK.BaseMappable
+public func >>> <T>(left: T, right: DDoctorSDK.Map) where T : DDoctorSDK.BaseMappable
+public func <- <T>(left: inout T?, right: DDoctorSDK.Map) where T : DDoctorSDK.BaseMappable
+public func >>> <T>(left: T?, right: DDoctorSDK.Map) where T : DDoctorSDK.BaseMappable
+public func <- <T>(left: inout Swift.Dictionary<Swift.String, T>, right: DDoctorSDK.Map) where T : DDoctorSDK.BaseMappable
+public func >>> <T>(left: Swift.Dictionary<Swift.String, T>, right: DDoctorSDK.Map) where T : DDoctorSDK.BaseMappable
+public func <- <T>(left: inout Swift.Dictionary<Swift.String, T>?, right: DDoctorSDK.Map) where T : DDoctorSDK.BaseMappable
+public func >>> <T>(left: Swift.Dictionary<Swift.String, T>?, right: DDoctorSDK.Map) where T : DDoctorSDK.BaseMappable
+public func <- <T>(left: inout Swift.Dictionary<Swift.String, [T]>, right: DDoctorSDK.Map) where T : DDoctorSDK.BaseMappable
+public func >>> <T>(left: Swift.Dictionary<Swift.String, [T]>, right: DDoctorSDK.Map) where T : DDoctorSDK.BaseMappable
+public func <- <T>(left: inout Swift.Dictionary<Swift.String, [T]>?, right: DDoctorSDK.Map) where T : DDoctorSDK.BaseMappable
+public func >>> <T>(left: Swift.Dictionary<Swift.String, [T]>?, right: DDoctorSDK.Map) where T : DDoctorSDK.BaseMappable
+public func <- <T>(left: inout Swift.Array<T>, right: DDoctorSDK.Map) where T : DDoctorSDK.BaseMappable
+public func >>> <T>(left: Swift.Array<T>, right: DDoctorSDK.Map) where T : DDoctorSDK.BaseMappable
+public func <- <T>(left: inout Swift.Array<T>?, right: DDoctorSDK.Map) where T : DDoctorSDK.BaseMappable
+public func >>> <T>(left: Swift.Array<T>?, right: DDoctorSDK.Map) where T : DDoctorSDK.BaseMappable
+public func <- <T>(left: inout Swift.Array<Swift.Array<T>>, right: DDoctorSDK.Map) where T : DDoctorSDK.BaseMappable
+public func >>> <T>(left: Swift.Array<Swift.Array<T>>, right: DDoctorSDK.Map) where T : DDoctorSDK.BaseMappable
+public func <- <T>(left: inout Swift.Array<Swift.Array<T>>?, right: DDoctorSDK.Map) where T : DDoctorSDK.BaseMappable
+public func >>> <T>(left: Swift.Array<Swift.Array<T>>?, right: DDoctorSDK.Map) where T : DDoctorSDK.BaseMappable
+public func <- <T>(left: inout Swift.Set<T>, right: DDoctorSDK.Map) where T : DDoctorSDK.BaseMappable, T : Swift.Hashable
+public func >>> <T>(left: Swift.Set<T>, right: DDoctorSDK.Map) where T : DDoctorSDK.BaseMappable, T : Swift.Hashable
+public func <- <T>(left: inout Swift.Set<T>?, right: DDoctorSDK.Map) where T : DDoctorSDK.BaseMappable, T : Swift.Hashable
+public func >>> <T>(left: Swift.Set<T>?, right: DDoctorSDK.Map) where T : DDoctorSDK.BaseMappable, T : Swift.Hashable
+public protocol PaddingProtocol {
+  func add(to: Swift.Array<Swift.UInt8>, blockSize: Swift.Int) -> Swift.Array<Swift.UInt8>
+  func remove(from: Swift.Array<Swift.UInt8>, blockSize: Swift.Int?) -> Swift.Array<Swift.UInt8>
+}
+public enum Padding : DDoctorSDK.PaddingProtocol {
+  case noPadding, zeroPadding, pkcs7, pkcs5, iso78164
+  public func add(to: Swift.Array<Swift.UInt8>, blockSize: Swift.Int) -> Swift.Array<Swift.UInt8>
+  public func remove(from: Swift.Array<Swift.UInt8>, blockSize: Swift.Int?) -> Swift.Array<Swift.UInt8>
+  public static func == (a: DDoctorSDK.Padding, b: DDoctorSDK.Padding) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+extension PKCS5 {
+  public struct PBKDF1 {
+    public enum Error : Swift.Error {
+      case invalidInput
+      case derivedKeyTooLong
+      public static func == (a: DDoctorSDK.PKCS5.PBKDF1.Error, b: DDoctorSDK.PKCS5.PBKDF1.Error) -> Swift.Bool
+      public func hash(into hasher: inout Swift.Hasher)
+      public var hashValue: Swift.Int {
+        get
+      }
+    }
+    public enum Variant {
+      case md5, sha1
+      @usableFromInline
+      internal var size: Swift.Int {
+        get
+      }
+      @usableFromInline
+      internal func calculateHash(_ bytes: Swift.Array<Swift.UInt8>) -> Swift.Array<Swift.UInt8>
+      public static func == (a: DDoctorSDK.PKCS5.PBKDF1.Variant, b: DDoctorSDK.PKCS5.PBKDF1.Variant) -> Swift.Bool
+      public func hash(into hasher: inout Swift.Hasher)
+      public var hashValue: Swift.Int {
+        get
+      }
+    }
+    @usableFromInline
+    internal let iterations: Swift.Int
+    @usableFromInline
+    internal let variant: DDoctorSDK.PKCS5.PBKDF1.Variant
+    @usableFromInline
+    internal let keyLength: Swift.Int
+    @usableFromInline
+    internal let t1: Swift.Array<Swift.UInt8>
+    public init(password: Swift.Array<Swift.UInt8>, salt: Swift.Array<Swift.UInt8>, variant: DDoctorSDK.PKCS5.PBKDF1.Variant = .sha1, iterations: Swift.Int = 4096, keyLength: Swift.Int? = nil) throws
+    @inlinable public func calculate() -> Swift.Array<Swift.UInt8> {
+      var t = self.t1
+      for _ in 2...self.iterations {
+        t = self.variant.calculateHash(t)
+      }
+      return Array(t[0..<self.keyLength])
+    }
+  }
+}
+extension PKCS5 {
+  public struct PBKDF2 {
+    public enum Error : Swift.Error {
+      case invalidInput
+      case derivedKeyTooLong
+      public static func == (a: DDoctorSDK.PKCS5.PBKDF2.Error, b: DDoctorSDK.PKCS5.PBKDF2.Error) -> Swift.Bool
+      public func hash(into hasher: inout Swift.Hasher)
+      public var hashValue: Swift.Int {
+        get
+      }
+    }
+    public init(password: Swift.Array<Swift.UInt8>, salt: Swift.Array<Swift.UInt8>, iterations: Swift.Int = 4096, keyLength: Swift.Int? = nil, variant: DDoctorSDK.HMAC.Variant = .sha256) throws
+    public func calculate() throws -> Swift.Array<Swift.UInt8>
+  }
+}
+public struct PCBC : DDoctorSDK.BlockMode {
+  public enum Error : Swift.Error {
+    case invalidInitializationVector
+    public static func == (a: DDoctorSDK.PCBC.Error, b: DDoctorSDK.PCBC.Error) -> Swift.Bool
+    public func hash(into hasher: inout Swift.Hasher)
+    public var hashValue: Swift.Int {
+      get
+    }
+  }
+  public let options: DDoctorSDK.BlockModeOption
+  public let customBlockSize: Swift.Int?
+  public init(iv: Swift.Array<Swift.UInt8>)
+  public func worker(blockSize: Swift.Int, cipherOperation: @escaping DDoctorSDK.CipherOperationOnBlock, encryptionOperation: @escaping DDoctorSDK.CipherOperationOnBlock) throws -> DDoctorSDK.CipherModeWorker
+}
+@objc public enum PermissionType : Swift.Int {
+  case locationAlways
+  case locationWhenInUse
+  case microphone
+  case camera
+  case photos
+  public init?(rawValue: Swift.Int)
+  public typealias RawValue = Swift.Int
+  public var rawValue: Swift.Int {
+    get
+  }
+}
+extension PermissionType : Swift.CustomStringConvertible {
+  public var description: Swift.String {
+    get
+  }
+}
+@_hasMissingDesignatedInitializers public class PhotoPicker {
+  public static func openCamera(config: DDoctorSDK.DrantCameraConfig, capFinished: DDoctorSDK.onCapFinished? = nil)
+  public static func reduceImages(paths: [Swift.String], finished: @escaping (([Swift.String]) -> Swift.Void))
+  public class func changeAvatar(vc: UIKit.UIViewController, reference: UIKit.UIView? = nil, uuid: Swift.Int, imgClosure: @escaping (UIKit.UIImage) -> Swift.Void, keyClosure: @escaping (Swift.String) -> Swift.Void)
+  @objc deinit
+}
+extension PhotoPicker {
+  public static func checkPermisstion(_ type: DDoctorSDK.PermissionType, authorized: (() -> Swift.Void)?, others: ((DDoctorSDK.PermissionType) -> Swift.Void)?)
+  public static func converSize(_ size: CoreGraphics.CGSize) -> CoreGraphics.CGSize
+}
+@_hasMissingDesignatedInitializers public class PhotoPickerConfig {
+  public static let `default`: DDoctorSDK.PhotoPickerConfig
+  public var miniPicTip: Swift.Bool
+  public var mMaxSelectCount: Swift.Int
+  public var mDetailColumnCount: Swift.Int
+  @objc deinit
+}
+public enum PKCS5 {
+}
+public enum PKCS7 {
+}
+final public class Poly1305 : DDoctorSDK.Authenticator {
+  public enum Error : Swift.Error {
+    case authenticateError
+    public static func == (a: DDoctorSDK.Poly1305.Error, b: DDoctorSDK.Poly1305.Error) -> Swift.Bool
+    public func hash(into hasher: inout Swift.Hasher)
+    public var hashValue: Swift.Int {
+      get
+    }
+  }
+  public static let blockSize: Swift.Int
+  public init(key: Swift.Array<Swift.UInt8>)
+  final public func authenticate(_ bytes: Swift.Array<Swift.UInt8>) throws -> Swift.Array<Swift.UInt8>
+  @objc deinit
+}
+extension Rabbit {
+  convenience public init(key: Swift.String) throws
+  convenience public init(key: Swift.String, iv: Swift.String) throws
+}
+final public class Rabbit {
+  public enum Error : Swift.Error {
+    case invalidKeyOrInitializationVector
+    public static func == (a: DDoctorSDK.Rabbit.Error, b: DDoctorSDK.Rabbit.Error) -> Swift.Bool
+    public func hash(into hasher: inout Swift.Hasher)
+    public var hashValue: Swift.Int {
+      get
+    }
+  }
+  public static let ivSize: Swift.Int
+  public static let keySize: Swift.Int
+  public static let blockSize: Swift.Int
+  final public var keySize: Swift.Int {
+    get
+  }
+  convenience public init(key: Swift.Array<Swift.UInt8>) throws
+  public init(key: Swift.Array<Swift.UInt8>, iv: Swift.Array<Swift.UInt8>?) throws
+  @objc deinit
+}
+extension Rabbit : DDoctorSDK.Cipher {
+  final public func encrypt(_ bytes: Swift.ArraySlice<Swift.UInt8>) throws -> Swift.Array<Swift.UInt8>
+  final public func decrypt(_ bytes: Swift.ArraySlice<Swift.UInt8>) throws -> Swift.Array<Swift.UInt8>
+}
+public enum ReachabilityError : Swift.Error {
+  case FailedToCreateWithAddress(Darwin.sockaddr_in)
+  case FailedToCreateWithHostname(Swift.String)
+  case UnableToSetCallback
+  case UnableToSetDispatchQueue
+}
+public let ReachabilityChangedNotification: Foundation.NSNotification.Name
+public class Reachability {
+  public typealias NetworkReachable = (DDoctorSDK.Reachability) -> ()
+  public typealias NetworkUnreachable = (DDoctorSDK.Reachability) -> ()
+  public enum NetworkStatus : Swift.CustomStringConvertible {
+    case notReachable, reachableViaWiFi, reachableViaWWAN
+    public var description: Swift.String {
+      get
+    }
+    public static func == (a: DDoctorSDK.Reachability.NetworkStatus, b: DDoctorSDK.Reachability.NetworkStatus) -> Swift.Bool
+    public func hash(into hasher: inout Swift.Hasher)
+    public var hashValue: Swift.Int {
+      get
+    }
+  }
+  public var whenReachable: DDoctorSDK.Reachability.NetworkReachable?
+  public var whenUnreachable: DDoctorSDK.Reachability.NetworkUnreachable?
+  public var reachableOnWWAN: Swift.Bool
+  public var currentReachabilityString: Swift.String {
+    get
+  }
+  public var currentReachabilityStatus: DDoctorSDK.Reachability.NetworkStatus {
+    get
+  }
+  required public init(reachabilityRef: SystemConfiguration.SCNetworkReachability)
+  convenience public init?(hostname: Swift.String)
+  convenience public init?()
+  @objc deinit
+}
+extension Reachability {
+  public func startNotifier() throws
+  public func stopNotifier()
+  public var isReachable: Swift.Bool {
+    get
+  }
+  public var isReachableViaWWAN: Swift.Bool {
+    get
+  }
+  public var isReachableViaWiFi: Swift.Bool {
+    get
+  }
+  public var description: Swift.String {
+    get
+  }
+}
+public struct RemoteData : DDoctorSDK.Mappable {
+  public var changeDoctorTime: Swift.Int
+  public init?(map: DDoctorSDK.Map)
+  public mutating func mapping(map: DDoctorSDK.Map)
+}
+final public class Scrypt {
+  public init(password: Swift.Array<Swift.UInt8>, salt: Swift.Array<Swift.UInt8>, dkLen: Swift.Int, N: Swift.Int, r: Swift.Int, p: Swift.Int) throws
+  final public func calculate() throws -> [Swift.UInt8]
+  @objc deinit
+}
+final public class SHA1 {
+  @usableFromInline
+  internal static let digestLength: Swift.Int
+  @usableFromInline
+  internal static let blockSize: Swift.Int
+  @usableFromInline
+  internal static let hashInitialValue: Swift.ContiguousArray<Swift.UInt32>
+  @usableFromInline
+  final internal var accumulated: [Swift.UInt8]
+  @usableFromInline
+  final internal var processedBytesTotalCount: Swift.Int
+  @usableFromInline
+  final internal var accumulatedHash: Swift.ContiguousArray<Swift.UInt32>
+  public init()
+  @inlinable final public func calculate(for bytes: Swift.Array<Swift.UInt8>) -> Swift.Array<Swift.UInt8> {
+    do {
+      return try update(withBytes: bytes.slice, isLast: true)
+    } catch {
+      return []
+    }
+  }
+  @usableFromInline
+  final internal func process(block chunk: Swift.ArraySlice<Swift.UInt8>, currentHash hh: inout Swift.ContiguousArray<Swift.UInt32>)
+  @objc deinit
+}
+extension SHA1 : DDoctorSDK.Updatable {
+  @discardableResult
+  @inlinable final public func update(withBytes bytes: Swift.ArraySlice<Swift.UInt8>, isLast: Swift.Bool = false) throws -> Swift.Array<Swift.UInt8> {
+    self.accumulated += bytes
+
+    if isLast {
+      let lengthInBits = (processedBytesTotalCount + self.accumulated.count) * 8
+      let lengthBytes = lengthInBits.bytes(totalBytes: 64 / 8) // A 64-bit representation of b
+
+      // Step 1. Append padding
+      bitPadding(to: &self.accumulated, blockSize: SHA1.blockSize, allowance: 64 / 8)
+
+      // Step 2. Append Length a 64-bit representation of lengthInBits
+      self.accumulated += lengthBytes
+    }
+
+    var processedBytes = 0
+    for chunk in self.accumulated.batched(by: SHA1.blockSize) {
+      if isLast || (self.accumulated.count - processedBytes) >= SHA1.blockSize {
+        self.process(block: chunk, currentHash: &self.accumulatedHash)
+        processedBytes += chunk.count
+      }
+    }
+    self.accumulated.removeFirst(processedBytes)
+    self.processedBytesTotalCount += processedBytes
+
+    // output current hash
+    var result = Array<UInt8>(repeating: 0, count: SHA1.digestLength)
+    var pos = 0
+    for idx in 0..<self.accumulatedHash.count {
+      let h = self.accumulatedHash[idx]
+      result[pos + 0] = UInt8((h >> 24) & 0xff)
+      result[pos + 1] = UInt8((h >> 16) & 0xff)
+      result[pos + 2] = UInt8((h >> 8) & 0xff)
+      result[pos + 3] = UInt8(h & 0xff)
+      pos += 4
+    }
+
+    // reset hash value for instance
+    if isLast {
+      self.accumulatedHash = SHA1.hashInitialValue
+    }
+
+    return result
+  }
+}
+final public class SHA2 {
+  @usableFromInline
+  final internal let variant: DDoctorSDK.SHA2.Variant
+  @usableFromInline
+  final internal let size: Swift.Int
+  @usableFromInline
+  final internal let blockSize: Swift.Int
+  @usableFromInline
+  final internal let digestLength: Swift.Int
+  @usableFromInline
+  final internal var accumulated: [Swift.UInt8]
+  @usableFromInline
+  final internal var processedBytesTotalCount: Swift.Int
+  @usableFromInline
+  final internal var accumulatedHash32: [Swift.UInt32]
+  @usableFromInline
+  final internal var accumulatedHash64: [Swift.UInt64]
+  public enum Variant : Swift.RawRepresentable {
+    case sha224, sha256, sha384, sha512
+    public var digestLength: Swift.Int {
+      get
+    }
+    public var blockSize: Swift.Int {
+      get
+    }
+    public typealias RawValue = Swift.Int
+    public var rawValue: DDoctorSDK.SHA2.Variant.RawValue {
+      get
+    }
+    public init?(rawValue: DDoctorSDK.SHA2.Variant.RawValue)
+    @usableFromInline
+    internal var h: Swift.Array<Swift.UInt64> {
+      get
+    }
+    @usableFromInline
+    internal var finalLength: Swift.Int {
+      get
+    }
+  }
+  public init(variant: DDoctorSDK.SHA2.Variant)
+  @inlinable final public func calculate(for bytes: Swift.Array<Swift.UInt8>) -> Swift.Array<Swift.UInt8> {
+    do {
+      return try update(withBytes: bytes.slice, isLast: true)
+    } catch {
+      return []
+    }
+  }
+  @usableFromInline
+  final internal func process64(block chunk: Swift.ArraySlice<Swift.UInt8>, currentHash hh: inout Swift.Array<Swift.UInt64>)
+  @usableFromInline
+  final internal func process32(block chunk: Swift.ArraySlice<Swift.UInt8>, currentHash hh: inout Swift.Array<Swift.UInt32>)
+  @objc deinit
+}
+extension SHA2 : DDoctorSDK.Updatable {
+  @inlinable final public func update(withBytes bytes: Swift.ArraySlice<Swift.UInt8>, isLast: Swift.Bool = false) throws -> Swift.Array<Swift.UInt8> {
+    self.accumulated += bytes
+
+    if isLast {
+      let lengthInBits = (processedBytesTotalCount + self.accumulated.count) * 8
+      let lengthBytes = lengthInBits.bytes(totalBytes: self.blockSize / 8) // A 64-bit/128-bit representation of b. blockSize fit by accident.
+
+      // Step 1. Append padding
+      bitPadding(to: &self.accumulated, blockSize: self.blockSize, allowance: self.blockSize / 8)
+
+      // Step 2. Append Length a 64-bit representation of lengthInBits
+      self.accumulated += lengthBytes
+    }
+
+    var processedBytes = 0
+    for chunk in self.accumulated.batched(by: self.blockSize) {
+      if isLast || (self.accumulated.count - processedBytes) >= self.blockSize {
+        switch self.variant {
+          case .sha224, .sha256:
+            self.process32(block: chunk, currentHash: &self.accumulatedHash32)
+          case .sha384, .sha512:
+            self.process64(block: chunk, currentHash: &self.accumulatedHash64)
+          @unknown default:
+            preconditionFailure()
+          }
+        processedBytes += chunk.count
+      }
+    }
+    self.accumulated.removeFirst(processedBytes)
+    self.processedBytesTotalCount += processedBytes
+
+    // output current hash
+    var result = Array<UInt8>(repeating: 0, count: variant.digestLength)
+    switch self.variant {
+      case .sha224, .sha256:
+        var pos = 0
+        for idx in 0..<self.accumulatedHash32.count where idx < self.variant.finalLength {
+          let h = accumulatedHash32[idx]
+          result[pos + 0] = UInt8((h >> 24) & 0xff)
+          result[pos + 1] = UInt8((h >> 16) & 0xff)
+          result[pos + 2] = UInt8((h >> 8) & 0xff)
+          result[pos + 3] = UInt8(h & 0xff)
+          pos += 4
+        }
+      case .sha384, .sha512:
+        var pos = 0
+        for idx in 0..<self.accumulatedHash64.count where idx < self.variant.finalLength {
+          let h = accumulatedHash64[idx]
+          result[pos + 0] = UInt8((h >> 56) & 0xff)
+          result[pos + 1] = UInt8((h >> 48) & 0xff)
+          result[pos + 2] = UInt8((h >> 40) & 0xff)
+          result[pos + 3] = UInt8((h >> 32) & 0xff)
+          result[pos + 4] = UInt8((h >> 24) & 0xff)
+          result[pos + 5] = UInt8((h >> 16) & 0xff)
+          result[pos + 6] = UInt8((h >> 8) & 0xff)
+          result[pos + 7] = UInt8(h & 0xff)
+          pos += 8
+        }
+      @unknown default:
+          preconditionFailure()
+    }
+
+    // reset hash value for instance
+    if isLast {
+      switch self.variant {
+        case .sha224, .sha256:
+          self.accumulatedHash32 = self.variant.h.lazy.map { UInt32($0) } // FIXME: UInt64 for process64
+        case .sha384, .sha512:
+          self.accumulatedHash64 = self.variant.h
+        @unknown default:
+          preconditionFailure()
+      }
+    }
+
+    return result
+  }
+}
+final public class SHA3 {
+  final public let blockSize: Swift.Int
+  final public let digestLength: Swift.Int
+  final public let markByte: Swift.UInt8
+  @usableFromInline
+  final internal var accumulated: [Swift.UInt8]
+  @usableFromInline
+  final internal var accumulatedHash: Swift.Array<Swift.UInt64>
+  public enum Variant {
+    case sha224, sha256, sha384, sha512, keccak224, keccak256, keccak384, keccak512
+    public var outputLength: Swift.Int {
+      get
+    }
+    public static func == (a: DDoctorSDK.SHA3.Variant, b: DDoctorSDK.SHA3.Variant) -> Swift.Bool
+    public func hash(into hasher: inout Swift.Hasher)
+    public var hashValue: Swift.Int {
+      get
+    }
+  }
+  public init(variant: DDoctorSDK.SHA3.Variant)
+  @inlinable final public func calculate(for bytes: Swift.Array<Swift.UInt8>) -> Swift.Array<Swift.UInt8> {
+    do {
+      return try update(withBytes: bytes.slice, isLast: true)
+    } catch {
+      return []
+    }
+  }
+  @usableFromInline
+  final internal func process(block chunk: Swift.ArraySlice<Swift.UInt64>, currentHash hh: inout Swift.Array<Swift.UInt64>)
+  @objc deinit
+}
+extension SHA3 : DDoctorSDK.Updatable {
+  @inlinable final public func update(withBytes bytes: Swift.ArraySlice<Swift.UInt8>, isLast: Swift.Bool = false) throws -> Swift.Array<Swift.UInt8> {
+    self.accumulated += bytes
+
+    if isLast {
+      // Add padding
+      let markByteIndex = self.accumulated.count
+
+      // We need to always pad the input. Even if the input is a multiple of blockSize.
+      let r = self.blockSize * 8
+      let q = (r / 8) - (accumulated.count % (r / 8))
+      self.accumulated += Array<UInt8>(repeating: 0, count: q)
+
+      self.accumulated[markByteIndex] |= self.markByte
+      self.accumulated[self.accumulated.count - 1] |= 0x80
+    }
+
+    var processedBytes = 0
+    for chunk in self.accumulated.batched(by: self.blockSize) {
+      if isLast || (self.accumulated.count - processedBytes) >= self.blockSize {
+        self.process(block: chunk.toUInt64Array().slice, currentHash: &self.accumulatedHash)
+        processedBytes += chunk.count
+      }
+    }
+    self.accumulated.removeFirst(processedBytes)
+
+    // TODO: verify performance, reduce vs for..in
+    let result = self.accumulatedHash.reduce(into: Array<UInt8>()) { (result, value) in
+      result += value.bigEndian.bytes()
+    }
+
+    // reset hash value for instance
+    if isLast {
+      self.accumulatedHash = Array<UInt64>(repeating: 0, count: self.digestLength)
+    }
+
+    return Array(result[0..<self.digestLength])
+  }
+}
+@usableFromInline
+final internal class StreamDecryptor : DDoctorSDK.Cryptor, DDoctorSDK.Updatable {
+  @usableFromInline
+  final internal let blockSize: Swift.Int
+  @usableFromInline
+  final internal var worker: DDoctorSDK.CipherModeWorker
+  @usableFromInline
+  final internal let padding: DDoctorSDK.Padding
+  @usableFromInline
+  final internal var accumulated: [Swift.UInt8]
+  @usableFromInline
+  final internal var lastBlockRemainder: Swift.Int
+  @usableFromInline
+  internal init(blockSize: Swift.Int, padding: DDoctorSDK.Padding, _ worker: DDoctorSDK.CipherModeWorker) throws
+  @inlinable final public func update(withBytes bytes: Swift.ArraySlice<Swift.UInt8>, isLast: Swift.Bool) throws -> Swift.Array<Swift.UInt8> {
+    self.accumulated += bytes
+
+    let toProcess = self.accumulated.prefix(max(self.accumulated.count - self.worker.additionalBufferSize, 0))
+
+    if var finalizingWorker = worker as? FinalizingDecryptModeWorker, isLast == true {
+      // will truncate suffix if needed
+      try finalizingWorker.willDecryptLast(bytes: self.accumulated.slice)
+    }
+
+    var processedBytesCount = 0
+    var plaintext = Array<UInt8>(reserveCapacity: bytes.count + self.worker.additionalBufferSize)
+    for chunk in toProcess.batched(by: self.blockSize) {
+      plaintext += self.worker.decrypt(block: chunk)
+      processedBytesCount += chunk.count
+    }
+
+    if var finalizingWorker = worker as? FinalizingDecryptModeWorker, isLast == true {
+      plaintext = Array(try finalizingWorker.didDecryptLast(bytes: plaintext.slice))
+    }
+
+    // omit unecessary calculation if not needed
+    if self.padding != .noPadding {
+      self.lastBlockRemainder = plaintext.count.quotientAndRemainder(dividingBy: self.blockSize).remainder
+    }
+
+    if isLast {
+      // CTR doesn't need padding. Really. Add padding to the last block if really want. but... don't.
+      plaintext = self.padding.remove(from: plaintext, blockSize: self.blockSize - self.lastBlockRemainder)
+    }
+
+    self.accumulated.removeFirst(processedBytesCount) // super-slow
+
+    if var finalizingWorker = worker as? FinalizingDecryptModeWorker, isLast == true {
+      plaintext = Array(try finalizingWorker.finalize(decrypt: plaintext.slice))
+    }
+
+    return plaintext
+  }
+  @inlinable final public func seek(to position: Swift.Int) throws {
+    guard var worker = self.worker as? SeekableModeWorker else {
+      fatalError("Not supported")
+    }
+
+    try worker.seek(to: position)
+    self.worker = worker
+  }
+  @objc @usableFromInline
+  deinit
+}
+@usableFromInline
+final internal class StreamEncryptor : DDoctorSDK.Cryptor, DDoctorSDK.Updatable {
+  @usableFromInline
+  final internal let blockSize: Swift.Int
+  @usableFromInline
+  final internal var worker: DDoctorSDK.CipherModeWorker
+  @usableFromInline
+  final internal let padding: DDoctorSDK.Padding
+  @usableFromInline
+  final internal var lastBlockRemainder: Swift.Int
+  @usableFromInline
+  internal init(blockSize: Swift.Int, padding: DDoctorSDK.Padding, _ worker: DDoctorSDK.CipherModeWorker) throws
+  @inlinable final public func update(withBytes bytes: Swift.ArraySlice<Swift.UInt8>, isLast: Swift.Bool) throws -> Swift.Array<Swift.UInt8> {
+    var accumulated = Array(bytes)
+    if isLast {
+      // CTR doesn't need padding. Really. Add padding to the last block if really want. but... don't.
+      accumulated = self.padding.add(to: accumulated, blockSize: self.blockSize - self.lastBlockRemainder)
+    }
+
+    var encrypted = Array<UInt8>(reserveCapacity: bytes.count)
+    for chunk in accumulated.batched(by: self.blockSize) {
+      encrypted += self.worker.encrypt(block: chunk)
+    }
+
+    // omit unecessary calculation if not needed
+    if self.padding != .noPadding {
+      self.lastBlockRemainder = encrypted.count.quotientAndRemainder(dividingBy: self.blockSize).remainder
+    }
+
+    if var finalizingWorker = worker as? FinalizingEncryptModeWorker, isLast == true {
+      encrypted = Array(try finalizingWorker.finalize(encrypt: encrypted.slice))
+    }
+
+    return encrypted
+  }
+  @usableFromInline
+  final internal func seek(to: Swift.Int) throws
+  @objc @usableFromInline
+  deinit
+}
+extension String {
+  @inlinable public var bytes: Swift.Array<Swift.UInt8> {
+    get {
+    data(using: String.Encoding.utf8, allowLossyConversion: true)?.bytes ?? Array(utf8)
+  }
+  }
+  @inlinable public func md5() -> Swift.String {
+    self.bytes.md5().toHexString()
+  }
+  @inlinable public func sha1() -> Swift.String {
+    self.bytes.sha1().toHexString()
+  }
+  @inlinable public func sha224() -> Swift.String {
+    self.bytes.sha224().toHexString()
+  }
+  @inlinable public func sha256() -> Swift.String {
+    self.bytes.sha256().toHexString()
+  }
+  @inlinable public func sha384() -> Swift.String {
+    self.bytes.sha384().toHexString()
+  }
+  @inlinable public func sha512() -> Swift.String {
+    self.bytes.sha512().toHexString()
+  }
+  @inlinable public func sha3(_ variant: DDoctorSDK.SHA3.Variant) -> Swift.String {
+    self.bytes.sha3(variant).toHexString()
+  }
+  @inlinable public func crc32(seed: Swift.UInt32? = nil, reflect: Swift.Bool = true) -> Swift.String {
+    self.bytes.crc32(seed: seed, reflect: reflect).bytes().toHexString()
+  }
+  @inlinable public func crc32c(seed: Swift.UInt32? = nil, reflect: Swift.Bool = true) -> Swift.String {
+    self.bytes.crc32c(seed: seed, reflect: reflect).bytes().toHexString()
+  }
+  @inlinable public func crc16(seed: Swift.UInt16? = nil) -> Swift.String {
+    self.bytes.crc16(seed: seed).bytes().toHexString()
+  }
+  @inlinable public func encrypt(cipher: DDoctorSDK.Cipher) throws -> Swift.String {
+    try self.bytes.encrypt(cipher: cipher).toHexString()
+  }
+  @inlinable public func encryptToBase64(cipher: DDoctorSDK.Cipher) throws -> Swift.String? {
+    try self.bytes.encrypt(cipher: cipher).toBase64()
+  }
+  @inlinable public func authenticate<A>(with authenticator: A) throws -> Swift.String where A : DDoctorSDK.Authenticator {
+    try self.bytes.authenticate(with: authenticator).toHexString()
+  }
+}
+extension String {
+  public func decryptBase64ToString(cipher: DDoctorSDK.Cipher) throws -> Swift.String
+  public func decryptBase64(cipher: DDoctorSDK.Cipher) throws -> Swift.Array<Swift.UInt8>
+}
+public enum ddToastPosition {
+  case top
+  case center
+  case bottom
+  public static func == (a: DDoctorSDK.ddToastPosition, b: DDoctorSDK.ddToastPosition) -> Swift.Bool
+  public func hash(into hasher: inout Swift.Hasher)
+  public var hashValue: Swift.Int {
+    get
+  }
+}
+extension UIView {
+  public func ddmakeToast(_ message: Swift.String)
+  public func ddmakeToast(_ message: Swift.String, duration: Foundation.TimeInterval, position: DDoctorSDK.ddToastPosition)
+  public func ddmakeToast(_ message: Swift.String, duration: Foundation.TimeInterval, position: CoreGraphics.CGPoint)
+  public func ddmakeToast(_ message: Swift.String, duration: Foundation.TimeInterval, position: DDoctorSDK.ddToastPosition, style: DDoctorSDK.ddToastStyle?)
+  public func ddmakeToast(_ message: Swift.String, duration: Foundation.TimeInterval, position: CoreGraphics.CGPoint, style: DDoctorSDK.ddToastStyle?)
+  public func ddmakeToast(_ message: Swift.String?, duration: Foundation.TimeInterval, position: DDoctorSDK.ddToastPosition, title: Swift.String?, image: UIKit.UIImage?, style: DDoctorSDK.ddToastStyle?, completion: ((Swift.Bool) -> Swift.Void)?)
+  public func ddmakeToast(_ message: Swift.String?, duration: Foundation.TimeInterval, position: CoreGraphics.CGPoint, title: Swift.String?, image: UIKit.UIImage?, style: DDoctorSDK.ddToastStyle?, completion: ((Swift.Bool) -> Swift.Void)?)
+  public func ddshowToast(_ toast: UIKit.UIView)
+  public func ddshowToast(_ toast: UIKit.UIView, duration: Foundation.TimeInterval, position: DDoctorSDK.ddToastPosition, completion: ((Swift.Bool) -> Swift.Void)?)
+  public func ddshowToast(_ toast: UIKit.UIView, duration: Foundation.TimeInterval, position: CoreGraphics.CGPoint, completion: ((Swift.Bool) -> Swift.Void)?)
+  public func ddmakeToastActivity(_ position: DDoctorSDK.ddToastPosition)
+  public func ddmakeToastActivity(_ position: CoreGraphics.CGPoint)
+  public func ddhideToastActivity()
+  @objc dynamic public func ddhandleToastTapped(_ recognizer: UIKit.UITapGestureRecognizer)
+  @objc dynamic public func ddtoastTimerDidFinish(_ timer: Foundation.Timer)
+  public func ddtoastViewForMessage(_ message: Swift.String?, title: Swift.String?, image: UIKit.UIImage?, style: DDoctorSDK.ddToastStyle) throws -> UIKit.UIView
+}
+public struct ddToastStyle {
+  public init()
+  public var backgroundColor: UIKit.UIColor
+  public var titleColor: UIKit.UIColor
+  public var messageColor: UIKit.UIColor
+  public var maxWidthPercentage: CoreGraphics.CGFloat {
+    get
+    set
+  }
+  public var maxHeightPercentage: CoreGraphics.CGFloat {
+    get
+    set
+  }
+  public var horizontalPadding: CoreGraphics.CGFloat
+  public var verticalPadding: CoreGraphics.CGFloat
+  public var cornerRadius: CoreGraphics.CGFloat
+  public var titleFont: UIKit.UIFont
+  public var messageFont: UIKit.UIFont
+  public var titleAlignment: UIKit.NSTextAlignment
+  public var messageAlignment: UIKit.NSTextAlignment
+  public var titleNumberOfLines: Swift.Int
+  public var messageNumberOfLines: Swift.Int
+  public var displayShadow: Swift.Bool
+  public var shadowColor: UIKit.UIColor
+  public var shadowOpacity: Swift.Float {
+    get
+    set
+  }
+  public var shadowRadius: CoreGraphics.CGFloat
+  public var shadowOffset: CoreGraphics.CGSize
+  public var imageSize: CoreGraphics.CGSize
+  public var activitySize: CoreGraphics.CGSize
+  public var fadeDuration: Swift.Double
+}
+public func <- <Transform>(left: inout Transform.Object, right: (DDoctorSDK.Map, Transform)) where Transform : DDoctorSDK.TransformType
+public func >>> <Transform>(left: Transform.Object, right: (DDoctorSDK.Map, Transform)) where Transform : DDoctorSDK.TransformType
+public func <- <Transform>(left: inout Transform.Object?, right: (DDoctorSDK.Map, Transform)) where Transform : DDoctorSDK.TransformType
+public func >>> <Transform>(left: Transform.Object?, right: (DDoctorSDK.Map, Transform)) where Transform : DDoctorSDK.TransformType
+public func <- <Transform>(left: inout [Transform.Object], right: (DDoctorSDK.Map, Transform)) where Transform : DDoctorSDK.TransformType
+public func >>> <Transform>(left: [Transform.Object], right: (DDoctorSDK.Map, Transform)) where Transform : DDoctorSDK.TransformType
+public func <- <Transform>(left: inout [Transform.Object]?, right: (DDoctorSDK.Map, Transform)) where Transform : DDoctorSDK.TransformType
+public func >>> <Transform>(left: [Transform.Object]?, right: (DDoctorSDK.Map, Transform)) where Transform : DDoctorSDK.TransformType
+public func <- <Transform>(left: inout [Swift.String : Transform.Object], right: (DDoctorSDK.Map, Transform)) where Transform : DDoctorSDK.TransformType
+public func >>> <Transform>(left: [Swift.String : Transform.Object], right: (DDoctorSDK.Map, Transform)) where Transform : DDoctorSDK.TransformType
+public func <- <Transform>(left: inout [Swift.String : Transform.Object]?, right: (DDoctorSDK.Map, Transform)) where Transform : DDoctorSDK.TransformType
+public func >>> <Transform>(left: [Swift.String : Transform.Object]?, right: (DDoctorSDK.Map, Transform)) where Transform : DDoctorSDK.TransformType
+public func <- <Transform>(left: inout Transform.Object, right: (DDoctorSDK.Map, Transform)) where Transform : DDoctorSDK.TransformType, Transform.Object : DDoctorSDK.BaseMappable
+public func >>> <Transform>(left: Transform.Object, right: (DDoctorSDK.Map, Transform)) where Transform : DDoctorSDK.TransformType, Transform.Object : DDoctorSDK.BaseMappable
+public func <- <Transform>(left: inout Transform.Object?, right: (DDoctorSDK.Map, Transform)) where Transform : DDoctorSDK.TransformType, Transform.Object : DDoctorSDK.BaseMappable
+public func <- <Transform>(left: inout Swift.Dictionary<Swift.String, Transform.Object>, right: (DDoctorSDK.Map, Transform)) where Transform : DDoctorSDK.TransformType, Transform.Object : DDoctorSDK.BaseMappable
+public func >>> <Transform>(left: Swift.Dictionary<Swift.String, Transform.Object>, right: (DDoctorSDK.Map, Transform)) where Transform : DDoctorSDK.TransformType, Transform.Object : DDoctorSDK.BaseMappable
+public func <- <Transform>(left: inout Swift.Dictionary<Swift.String, Transform.Object>?, right: (DDoctorSDK.Map, Transform)) where Transform : DDoctorSDK.TransformType, Transform.Object : DDoctorSDK.BaseMappable
+public func >>> <Transform>(left: Swift.Dictionary<Swift.String, Transform.Object>?, right: (DDoctorSDK.Map, Transform)) where Transform : DDoctorSDK.TransformType, Transform.Object : DDoctorSDK.BaseMappable
+public func <- <Transform>(left: inout Swift.Dictionary<Swift.String, [Transform.Object]>, right: (DDoctorSDK.Map, Transform)) where Transform : DDoctorSDK.TransformType, Transform.Object : DDoctorSDK.BaseMappable
+public func >>> <Transform>(left: Swift.Dictionary<Swift.String, [Transform.Object]>, right: (DDoctorSDK.Map, Transform)) where Transform : DDoctorSDK.TransformType, Transform.Object : DDoctorSDK.BaseMappable
+public func <- <Transform>(left: inout Swift.Dictionary<Swift.String, [Transform.Object]>?, right: (DDoctorSDK.Map, Transform)) where Transform : DDoctorSDK.TransformType, Transform.Object : DDoctorSDK.BaseMappable
+public func >>> <Transform>(left: Swift.Dictionary<Swift.String, [Transform.Object]>?, right: (DDoctorSDK.Map, Transform)) where Transform : DDoctorSDK.TransformType, Transform.Object : DDoctorSDK.BaseMappable
+public func <- <Transform>(left: inout Swift.Array<Transform.Object>, right: (DDoctorSDK.Map, Transform)) where Transform : DDoctorSDK.TransformType, Transform.Object : DDoctorSDK.BaseMappable
+public func >>> <Transform>(left: Swift.Array<Transform.Object>, right: (DDoctorSDK.Map, Transform)) where Transform : DDoctorSDK.TransformType, Transform.Object : DDoctorSDK.BaseMappable
+public func <- <Transform>(left: inout Swift.Array<Transform.Object>?, right: (DDoctorSDK.Map, Transform)) where Transform : DDoctorSDK.TransformType, Transform.Object : DDoctorSDK.BaseMappable
+public func >>> <Transform>(left: Swift.Array<Transform.Object>?, right: (DDoctorSDK.Map, Transform)) where Transform : DDoctorSDK.TransformType, Transform.Object : DDoctorSDK.BaseMappable
+public func <- <Transform>(left: inout [[Transform.Object]], right: (DDoctorSDK.Map, Transform)) where Transform : DDoctorSDK.TransformType
+public func >>> <Transform>(left: [[Transform.Object]], right: (DDoctorSDK.Map, Transform)) where Transform : DDoctorSDK.TransformType
+public func <- <Transform>(left: inout [[Transform.Object]]?, right: (DDoctorSDK.Map, Transform)) where Transform : DDoctorSDK.TransformType
+public func >>> <Transform>(left: [[Transform.Object]]?, right: (DDoctorSDK.Map, Transform)) where Transform : DDoctorSDK.TransformType
+public func <- <Transform>(left: inout Swift.Set<Transform.Object>, right: (DDoctorSDK.Map, Transform)) where Transform : DDoctorSDK.TransformType, Transform.Object : DDoctorSDK.BaseMappable, Transform.Object : Swift.Hashable
+public func >>> <Transform>(left: Swift.Set<Transform.Object>, right: (DDoctorSDK.Map, Transform)) where Transform : DDoctorSDK.TransformType, Transform.Object : DDoctorSDK.BaseMappable, Transform.Object : Swift.Hashable
+public func <- <Transform>(left: inout Swift.Set<Transform.Object>?, right: (DDoctorSDK.Map, Transform)) where Transform : DDoctorSDK.TransformType, Transform.Object : DDoctorSDK.BaseMappable, Transform.Object : Swift.Hashable
+public func >>> <Transform>(left: Swift.Set<Transform.Object>?, right: (DDoctorSDK.Map, Transform)) where Transform : DDoctorSDK.TransformType, Transform.Object : DDoctorSDK.BaseMappable, Transform.Object : Swift.Hashable
+public protocol TransformType {
+  associatedtype Object
+  associatedtype JSON
+  func transformFromJSON(_ value: Any?) -> Self.Object?
+  func transformToJSON(_ value: Self.Object?) -> Self.JSON?
+}
+@objc @_inheritsConvenienceInitializers @_hasMissingDesignatedInitializers public class TRTCManager : ObjectiveC.NSObject {
+  public static let `default`: DDoctorSDK.TRTCManager
+  @objc deinit
+}
+extension TRTCManager {
+  public func isLogined() -> Swift.Bool
+  public func login(complete: @escaping DDoctorSDK.DrantLoginHandler)
+}
+extension TRTCManager : ImSDK.TIMMessageListener {
+  @objc dynamic public func onNewMessage(_ msgs: [Any]!)
+}
+extension TRTCManager : ImSDK.TIMConnListener {
+  @objc dynamic public func onConnSucc()
+  @objc dynamic public func onConnFailed(_ code: Swift.Int32, err: Swift.String!)
+  @objc dynamic public func onDisconnect(_ code: Swift.Int32, err: Swift.String!)
+}
+extension TRTCManager : TXLiteAVSDK_Professional.TRTCCloudDelegate {
+  @objc dynamic public func onEnterRoom(_ result: Swift.Int)
+  @objc dynamic public func onError(_ errCode: TXLiteAVSDK_Professional.TXLiteAVError, errMsg: Swift.String?, extInfo: [Swift.AnyHashable : Any]?)
+}
+extension TRTCManager : TXLiteAVSDK_Professional.TRTCLogDelegate {
+  @objc dynamic public func onLog(_ log: Swift.String?, logLevel level: TXLiteAVSDK_Professional.TRTCLogLevel, whichModule module: Swift.String?)
+}
+extension TRTCManager : ImSDK.TIMUserStatusListener {
+  @objc dynamic public func onForceOffline()
+  @objc dynamic public func onReConnFailed(_ code: Swift.Int32, err: Swift.String!)
+  @objc dynamic public func onUserSigExpired()
+}
+extension String {
+  public func subFrom(_ index: Swift.Int) -> Swift.String
+}
+extension UInt32 {
+  @_specialize(exported: false, kind: full, where T == Swift.ArraySlice<Swift.UInt8>)
+  @inlinable internal init<T>(bytes: T, fromIndex index: T.Index) where T : Swift.Collection, T.Element == Swift.UInt8, T.Index == Swift.Int {
+    if bytes.isEmpty {
+      self = 0
+      return
+    }
+
+    let count = bytes.count
+
+    let val0 = count > 0 ? UInt32(bytes[index.advanced(by: 0)]) << 24 : 0
+    let val1 = count > 1 ? UInt32(bytes[index.advanced(by: 1)]) << 16 : 0
+    let val2 = count > 2 ? UInt32(bytes[index.advanced(by: 2)]) << 8 : 0
+    let val3 = count > 3 ? UInt32(bytes[index.advanced(by: 3)]) : 0
+
+    self = val0 | val1 | val2 | val3
+  }
+}
+extension UInt64 {
+  @_specialize(exported: false, kind: full, where T == Swift.ArraySlice<Swift.UInt8>)
+  @inlinable internal init<T>(bytes: T, fromIndex index: T.Index) where T : Swift.Collection, T.Element == Swift.UInt8, T.Index == Swift.Int {
+    if bytes.isEmpty {
+      self = 0
+      return
+    }
+
+    let count = bytes.count
+
+    let val0 = count > 0 ? UInt64(bytes[index.advanced(by: 0)]) << 56 : 0
+    let val1 = count > 1 ? UInt64(bytes[index.advanced(by: 1)]) << 48 : 0
+    let val2 = count > 2 ? UInt64(bytes[index.advanced(by: 2)]) << 40 : 0
+    let val3 = count > 3 ? UInt64(bytes[index.advanced(by: 3)]) << 32 : 0
+    let val4 = count > 4 ? UInt64(bytes[index.advanced(by: 4)]) << 24 : 0
+    let val5 = count > 5 ? UInt64(bytes[index.advanced(by: 5)]) << 16 : 0
+    let val6 = count > 6 ? UInt64(bytes[index.advanced(by: 6)]) << 8 : 0
+    let val7 = count > 7 ? UInt64(bytes[index.advanced(by: 7)]) : 0
+
+    self = val0 | val1 | val2 | val3 | val4 | val5 | val6 | val7
+  }
+}
+public protocol _UInt8Type {
+}
+extension UInt8 : DDoctorSDK._UInt8Type {
+}
+extension UInt8 {
+  public func bits() -> [DDoctorSDK.Bit]
+  public func bits() -> Swift.String
+}
+public protocol Updatable {
+  mutating func update(withBytes bytes: Swift.ArraySlice<Swift.UInt8>, isLast: Swift.Bool) throws -> Swift.Array<Swift.UInt8>
+  mutating func update(withBytes bytes: Swift.ArraySlice<Swift.UInt8>, isLast: Swift.Bool, output: (Swift.Array<Swift.UInt8>) -> Swift.Void) throws
+}
+extension Updatable {
+  @inlinable public mutating func update(withBytes bytes: Swift.ArraySlice<Swift.UInt8>, isLast: Swift.Bool = false, output: (Swift.Array<Swift.UInt8>) -> Swift.Void) throws {
+    let processed = try update(withBytes: bytes, isLast: isLast)
+    if !processed.isEmpty {
+      output(processed)
+    }
+  }
+  @inlinable public mutating func update(withBytes bytes: Swift.ArraySlice<Swift.UInt8>, isLast: Swift.Bool = false) throws -> Swift.Array<Swift.UInt8> {
+    try self.update(withBytes: bytes, isLast: isLast)
+  }
+  @inlinable public mutating func update(withBytes bytes: Swift.Array<Swift.UInt8>, isLast: Swift.Bool = false) throws -> Swift.Array<Swift.UInt8> {
+    try self.update(withBytes: bytes.slice, isLast: isLast)
+  }
+  @inlinable public mutating func update(withBytes bytes: Swift.Array<Swift.UInt8>, isLast: Swift.Bool = false, output: (Swift.Array<Swift.UInt8>) -> Swift.Void) throws {
+    try self.update(withBytes: bytes.slice, isLast: isLast, output: output)
+  }
+  @inlinable public mutating func finish(withBytes bytes: Swift.ArraySlice<Swift.UInt8>) throws -> Swift.Array<Swift.UInt8> {
+    try self.update(withBytes: bytes, isLast: true)
+  }
+  @inlinable public mutating func finish(withBytes bytes: Swift.Array<Swift.UInt8>) throws -> Swift.Array<Swift.UInt8> {
+    try self.finish(withBytes: bytes.slice)
+  }
+  @inlinable public mutating func finish() throws -> Swift.Array<Swift.UInt8> {
+    try self.update(withBytes: [], isLast: true)
+  }
+  @inlinable public mutating func finish(withBytes bytes: Swift.ArraySlice<Swift.UInt8>, output: (Swift.Array<Swift.UInt8>) -> Swift.Void) throws {
+    let processed = try update(withBytes: bytes, isLast: true)
+    if !processed.isEmpty {
+      output(processed)
+    }
+  }
+  @inlinable public mutating func finish(withBytes bytes: Swift.Array<Swift.UInt8>, output: (Swift.Array<Swift.UInt8>) -> Swift.Void) throws {
+    try self.finish(withBytes: bytes.slice, output: output)
+  }
+  @inlinable public mutating func finish(output: (Swift.Array<Swift.UInt8>) -> Swift.Void) throws {
+    try self.finish(withBytes: [], output: output)
+  }
+}
+public typealias onProgress = ((CoreGraphics.CGFloat, Swift.String) -> Swift.Void)
+public typealias onUploadOnce = ((Swift.Bool, DDoctorSDK.DrantUploadModel) -> Swift.Void)
+public typealias onFinished = (() -> Swift.Void)
+public class DrantUploadConfig {
+  public var progress: DDoctorSDK.onProgress?
+  public var uploadOnce: DDoctorSDK.onUploadOnce?
+  public var finished: DDoctorSDK.onFinished?
+  public var orderId: Swift.String?
+  public init()
+  @objc deinit
+}
+public class DrantUploadModel {
+  public var clouldKey: Swift.String?
+  public var filePath: Swift.String? {
+    get
+    set
+  }
+  public var smallImage: Swift.String
+  public var state: DDoctorSDK.UploadState?
+  public init()
+  public init(full: Swift.String?, scale: Swift.String)
+  public init(clouldKey: Swift.String?, filePath: Swift.String?, uploadTime: Foundation.TimeInterval?, name: Swift.String?, smallImage: Swift.String)
+  @objc deinit
+}
+@_hasMissingDesignatedInitializers public class UploadState {
+  public var file: Swift.String?
+  public var isSelect: Swift.Bool
+  public var changed: (() -> Swift.Void)?
+  public var progress: Swift.Float {
+    get
+    set
+  }
+  public func isSuccess() -> Swift.Bool
+  public func isFail() -> Swift.Bool
+  @objc deinit
+}
+@inlinable internal func rotateLeft(_ value: Swift.UInt8, by: Swift.UInt8) -> Swift.UInt8 {
+  ((value << by) & 0xff) | (value >> (8 - by))
+}
+@inlinable internal func rotateLeft(_ value: Swift.UInt16, by: Swift.UInt16) -> Swift.UInt16 {
+  ((value << by) & 0xffff) | (value >> (16 - by))
+}
+@inlinable internal func rotateLeft(_ value: Swift.UInt32, by: Swift.UInt32) -> Swift.UInt32 {
+  ((value << by) & 0xffffffff) | (value >> (32 - by))
+}
+@inlinable internal func rotateLeft(_ value: Swift.UInt64, by: Swift.UInt64) -> Swift.UInt64 {
+  (value << by) | (value >> (64 - by))
+}
+@inlinable internal func rotateRight(_ value: Swift.UInt16, by: Swift.UInt16) -> Swift.UInt16 {
+  (value >> by) | (value << (16 - by))
+}
+@inlinable internal func rotateRight(_ value: Swift.UInt32, by: Swift.UInt32) -> Swift.UInt32 {
+  (value >> by) | (value << (32 - by))
+}
+@inlinable internal func rotateRight(_ value: Swift.UInt64, by: Swift.UInt64) -> Swift.UInt64 {
+  ((value >> by) | (value << (64 - by)))
+}
+@inlinable internal func reversed(_ uint8: Swift.UInt8) -> Swift.UInt8 {
+  var v = uint8
+  v = (v & 0xf0) >> 4 | (v & 0x0f) << 4
+  v = (v & 0xcc) >> 2 | (v & 0x33) << 2
+  v = (v & 0xaa) >> 1 | (v & 0x55) << 1
+  return v
+}
+@inlinable internal func reversed(_ uint32: Swift.UInt32) -> Swift.UInt32 {
+  var v = uint32
+  v = ((v >> 1) & 0x55555555) | ((v & 0x55555555) << 1)
+  v = ((v >> 2) & 0x33333333) | ((v & 0x33333333) << 2)
+  v = ((v >> 4) & 0x0f0f0f0f) | ((v & 0x0f0f0f0f) << 4)
+  v = ((v >> 8) & 0x00ff00ff) | ((v & 0x00ff00ff) << 8)
+  v = ((v >> 16) & 0xffff) | ((v & 0xffff) << 16)
+  return v
+}
+@inlinable internal func xor<T, V>(_ left: T, _ right: V) -> Swift.ArraySlice<Swift.UInt8> where T : Swift.RandomAccessCollection, V : Swift.RandomAccessCollection, T.Element == Swift.UInt8, T.Index == Swift.Int, V.Element == Swift.UInt8, V.Index == Swift.Int {
+  return xor(left, right).slice
+}
+@inlinable internal func xor<T, V>(_ left: T, _ right: V) -> Swift.Array<Swift.UInt8> where T : Swift.RandomAccessCollection, V : Swift.RandomAccessCollection, T.Element == Swift.UInt8, T.Index == Swift.Int, V.Element == Swift.UInt8, V.Index == Swift.Int {
+  let length = Swift.min(left.count, right.count)
+
+  let buf = UnsafeMutablePointer<UInt8>.allocate(capacity: length)
+  buf.initialize(repeating: 0, count: length)
+  defer {
+    buf.deinitialize(count: length)
+    buf.deallocate()
+  }
+
+  // xor
+  for i in 0..<length {
+    buf[i] = left[left.startIndex.advanced(by: i)] ^ right[right.startIndex.advanced(by: i)]
+  }
+
+  return Array(UnsafeBufferPointer(start: buf, count: length))
+}
+@inline(__always) @inlinable internal func bitPadding(to data: inout Swift.Array<Swift.UInt8>, blockSize: Swift.Int, allowance: Swift.Int = 0) {
+  let msgLength = data.count
+  // Step 1. Append Padding Bits
+  // append one bit (UInt8 with one bit) to message
+  data.append(0x80)
+
+  // Step 2. append "0" bit until message length in bits ≡ 448 (mod 512)
+  let max = blockSize - allowance // 448, 986
+  if msgLength % blockSize < max { // 448
+    data += Array<UInt8>(repeating: 0, count: max - 1 - (msgLength % blockSize))
+  } else {
+    data += Array<UInt8>(repeating: 0, count: blockSize + max - 1 - (msgLength % blockSize))
+  }
+}
+@_hasMissingDesignatedInitializers public class WeakArray<T> {
+  public func add(_ delegate: T)
+  public func remove(_ delegate: T)
+  public func excute(_ block: @escaping ((T?) -> Swift.Void))
+  @objc deinit
+}
+extension DDoctorSDK.AES.Error : Swift.Equatable {}
+extension DDoctorSDK.AES.Error : Swift.Hashable {}
+extension DDoctorSDK.AES.Variant : Swift.Equatable {}
+extension DDoctorSDK.AES.Variant : Swift.Hashable {}
+extension DDoctorSDK.AES.Variant : Swift.RawRepresentable {}
+extension DDoctorSDK.Bit : Swift.Equatable {}
+extension DDoctorSDK.Bit : Swift.Hashable {}
+extension DDoctorSDK.Bit : Swift.RawRepresentable {}
+extension DDoctorSDK.Blowfish.Error : Swift.Equatable {}
+extension DDoctorSDK.Blowfish.Error : Swift.Hashable {}
+extension DDoctorSDK.CBC.Error : Swift.Equatable {}
+extension DDoctorSDK.CBC.Error : Swift.Hashable {}
+extension DDoctorSDK.CCM : DDoctorSDK.BlockMode {}
+extension DDoctorSDK.CCM.Error : Swift.Equatable {}
+extension DDoctorSDK.CCM.Error : Swift.Hashable {}
+extension DDoctorSDK.CFB.Error : Swift.Equatable {}
+extension DDoctorSDK.CFB.Error : Swift.Hashable {}
+extension DDoctorSDK.CFB.SegmentSize : Swift.Equatable {}
+extension DDoctorSDK.CFB.SegmentSize : Swift.Hashable {}
+extension DDoctorSDK.CFB.SegmentSize : Swift.RawRepresentable {}
+extension DDoctorSDK.ChaCha20.Error : Swift.Equatable {}
+extension DDoctorSDK.ChaCha20.Error : Swift.Hashable {}
+extension DDoctorSDK.CipherError : Swift.Equatable {}
+extension DDoctorSDK.CipherError : Swift.Hashable {}
+extension DDoctorSDK.CMAC.Error : Swift.Equatable {}
+extension DDoctorSDK.CMAC.Error : Swift.Hashable {}
+extension DDoctorSDK.CTR : DDoctorSDK.BlockMode {}
+extension DDoctorSDK.CTR.Error : Swift.Equatable {}
+extension DDoctorSDK.CTR.Error : Swift.Hashable {}
+extension DDoctorSDK.DGElasticPullToRefreshState : Swift.Equatable {}
+extension DDoctorSDK.DGElasticPullToRefreshState : Swift.Hashable {}
+extension DDoctorSDK.DGElasticPullToRefreshState : Swift.RawRepresentable {}
+extension DDoctorSDK.DrantFileCacheManager.DrantAssetPathType : Swift.Equatable {}
+extension DDoctorSDK.DrantFileCacheManager.DrantAssetPathType : Swift.Hashable {}
+extension DDoctorSDK.DrantLogMode : Swift.Equatable {}
+extension DDoctorSDK.DrantLogMode : Swift.Hashable {}
+extension DDoctorSDK.DrantLogMode : Swift.RawRepresentable {}
+extension DDoctorSDK.DrantLoginCode : Swift.Equatable {}
+extension DDoctorSDK.DrantLoginCode : Swift.Hashable {}
+extension DDoctorSDK.DrantLoginCode : Swift.RawRepresentable {}
+extension DDoctorSDK.SkipType : Swift.Equatable {}
+extension DDoctorSDK.SkipType : Swift.Hashable {}
+extension DDoctorSDK.SkipType : Swift.RawRepresentable {}
+extension DDoctorSDK.DrantCallingState : Swift.Equatable {}
+extension DDoctorSDK.DrantCallingState : Swift.Hashable {}
+extension DDoctorSDK.DrantCallingState : Swift.RawRepresentable {}
+extension DDoctorSDK.GCM.Mode : Swift.Equatable {}
+extension DDoctorSDK.GCM.Mode : Swift.Hashable {}
+extension DDoctorSDK.GCM.Error : Swift.Equatable {}
+extension DDoctorSDK.GCM.Error : Swift.Hashable {}
+extension DDoctorSDK.DrantMediaType : Swift.Equatable {}
+extension DDoctorSDK.DrantMediaType : Swift.Hashable {}
+extension DDoctorSDK.DrantMediaType : Swift.RawRepresentable {}
+extension DDoctorSDK.DateFormat : Swift.Equatable {}
+extension DDoctorSDK.DateFormat : Swift.Hashable {}
+extension DDoctorSDK.DateFormat : Swift.RawRepresentable {}
+extension DDoctorSDK.DrantCallType : Swift.Equatable {}
+extension DDoctorSDK.DrantCallType : Swift.Hashable {}
+extension DDoctorSDK.DrantCallType : Swift.RawRepresentable {}
+extension DDoctorSDK.DrantRequestMethod : Swift.Equatable {}
+extension DDoctorSDK.DrantRequestMethod : Swift.Hashable {}
+extension DDoctorSDK.DrantServerType : Swift.Equatable {}
+extension DDoctorSDK.DrantServerType : Swift.Hashable {}
+extension DDoctorSDK.DrantPagerViewTransformerType : Swift.Equatable {}
+extension DDoctorSDK.DrantPagerViewTransformerType : Swift.Hashable {}
+extension DDoctorSDK.DrantPagerViewTransformerType : Swift.RawRepresentable {}
+extension DDoctorSDK.HKDF.Error : Swift.Equatable {}
+extension DDoctorSDK.HKDF.Error : Swift.Hashable {}
+extension DDoctorSDK.HMAC.Error : Swift.Equatable {}
+extension DDoctorSDK.HMAC.Error : Swift.Hashable {}
+extension DDoctorSDK.HMAC.Variant : Swift.Equatable {}
+extension DDoctorSDK.HMAC.Variant : Swift.Hashable {}
+extension DDoctorSDK.ItemClass : Swift.Equatable {}
+extension DDoctorSDK.ItemClass : Swift.Hashable {}
+extension DDoctorSDK.ProtocolType : Swift.Equatable {}
+extension DDoctorSDK.ProtocolType : Swift.Hashable {}
+extension DDoctorSDK.AuthenticationType : Swift.Equatable {}
+extension DDoctorSDK.AuthenticationType : Swift.Hashable {}
+extension DDoctorSDK.Accessibility : Swift.Equatable {}
+extension DDoctorSDK.Accessibility : Swift.Hashable {}
+extension DDoctorSDK.Status : Swift.Equatable {}
+extension DDoctorSDK.Status : Swift.Hashable {}
+extension DDoctorSDK.OCB.Mode : Swift.Equatable {}
+extension DDoctorSDK.OCB.Mode : Swift.Hashable {}
+extension DDoctorSDK.OCB.Error : Swift.Equatable {}
+extension DDoctorSDK.OCB.Error : Swift.Hashable {}
+extension DDoctorSDK.OFB.Error : Swift.Equatable {}
+extension DDoctorSDK.OFB.Error : Swift.Hashable {}
+extension DDoctorSDK.Padding : Swift.Equatable {}
+extension DDoctorSDK.Padding : Swift.Hashable {}
+extension DDoctorSDK.PKCS5.PBKDF1.Error : Swift.Equatable {}
+extension DDoctorSDK.PKCS5.PBKDF1.Error : Swift.Hashable {}
+extension DDoctorSDK.PKCS5.PBKDF1.Variant : Swift.Equatable {}
+extension DDoctorSDK.PKCS5.PBKDF1.Variant : Swift.Hashable {}
+extension DDoctorSDK.PKCS5.PBKDF2.Error : Swift.Equatable {}
+extension DDoctorSDK.PKCS5.PBKDF2.Error : Swift.Hashable {}
+extension DDoctorSDK.PCBC.Error : Swift.Equatable {}
+extension DDoctorSDK.PCBC.Error : Swift.Hashable {}
+extension DDoctorSDK.PermissionType : Swift.Equatable {}
+extension DDoctorSDK.PermissionType : Swift.Hashable {}
+extension DDoctorSDK.PermissionType : Swift.RawRepresentable {}
+extension DDoctorSDK.Poly1305.Error : Swift.Equatable {}
+extension DDoctorSDK.Poly1305.Error : Swift.Hashable {}
+extension DDoctorSDK.Rabbit.Error : Swift.Equatable {}
+extension DDoctorSDK.Rabbit.Error : Swift.Hashable {}
+extension DDoctorSDK.Reachability.NetworkStatus : Swift.Equatable {}
+extension DDoctorSDK.Reachability.NetworkStatus : Swift.Hashable {}
+extension DDoctorSDK.SHA2.Variant : Swift.Equatable {}
+extension DDoctorSDK.SHA2.Variant : Swift.Hashable {}
+extension DDoctorSDK.SHA3.Variant : Swift.Equatable {}
+extension DDoctorSDK.SHA3.Variant : Swift.Hashable {}
+extension DDoctorSDK.ddToastPosition : Swift.Equatable {}
+extension DDoctorSDK.ddToastPosition : Swift.Hashable {}
