@@ -20,23 +20,23 @@ typedef NS_ENUM(NSInteger, DImageFormat) {
     DImageFormatHEIC
 };
 
-@interface NSData (hhImageContentType)
+@interface NSData (drantImageContentType)
 
 /**
  *  Return image format
  *
  *  @param data the input image data
  *
- *  @return the image format as `HHImageFormat` (enum)
+ *  @return the image format as `DrantImageFormat` (enum)
  */
 + (DImageFormat)d_imageFormatForImageData:(nullable NSData *)data;
 
 /**
- Convert HHImageFormat to UTType
+ Convert DrantImageFormat to UTType
 
- @param format Format as HHImageFormat
+ @param format Format as DrantImageFormat
  @return The UTType as CFStringRef
  */
-+ (nonnull CFStringRef)d_UTTypeFromHHImageFormat:(DImageFormat)format;
++ (nonnull CFStringRef)d_UTTypeFromDImageFormat:(DImageFormat)format;
 
 @end

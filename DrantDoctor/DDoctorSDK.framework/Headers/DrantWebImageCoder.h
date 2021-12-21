@@ -20,7 +20,7 @@ FOUNDATION_EXPORT NSString * _Nonnull const DrantWebImageCoderScaleDownLargeImag
 
  @return The device-dependent RGB color space
  */
-CG_EXTERN CGColorSpaceRef _Nonnull HHCGColorSpaceGetDeviceRGB(void);
+CG_EXTERN CGColorSpaceRef _Nonnull DrantCGColorSpaceGetDeviceRGB(void);
 
 /**
  Check whether CGImageRef contains alpha channel.
@@ -28,7 +28,7 @@ CG_EXTERN CGColorSpaceRef _Nonnull HHCGColorSpaceGetDeviceRGB(void);
  @param imageRef The CGImageRef
  @return Return YES if CGImageRef contains alpha channel, otherwise return NO
  */
-CG_EXTERN BOOL HHCGImageRefContainsAlpha(_Nullable CGImageRef imageRef);
+CG_EXTERN BOOL DrantCGImageRefContainsAlpha(_Nullable CGImageRef imageRef);
 
 
 /**
@@ -82,7 +82,7 @@ CG_EXTERN BOOL HHCGImageRefContainsAlpha(_Nullable CGImageRef imageRef);
  Encode the image to image data.
 
  @param image The image to be encoded
- @param format The image format to encode, you should note `HHImageFormatUndefined` format is also  possible
+ @param format The image format to encode, you should note `DrantImageFormatUndefined` format is also  possible
  @return The encoded image data
  */
 - (nullable NSData *)encodedDataWithImage:(nullable UIImage *)image format:(DImageFormat)format;

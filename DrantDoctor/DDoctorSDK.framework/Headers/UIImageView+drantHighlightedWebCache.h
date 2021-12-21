@@ -50,7 +50,7 @@
  *                       The fourth parameter is the original image url.
  */
 - (void)d_setHighlightedImageWithURL:(nullable NSURL *)url
-                            completed:(nullable HHExternalCompletionBlock)completedBlock NS_REFINED_FOR_SWIFT;
+                            completed:(nullable DrantExternalCompletionBlock)completedBlock NS_REFINED_FOR_SWIFT;
 
 /**
  * Set the imageView `highlightedImage` with an `url` and custom options.
@@ -67,7 +67,7 @@
  */
 - (void)d_setHighlightedImageWithURL:(nullable NSURL *)url
                               options:(DrantWebImageOptions)options
-                            completed:(nullable HHExternalCompletionBlock)completedBlock;
+                            completed:(nullable DrantExternalCompletionBlock)completedBlock;
 
 /**
  * Set the imageView `highlightedImage` with an `url` and custom options.
@@ -87,7 +87,7 @@
 - (void)d_setHighlightedImageWithURL:(nullable NSURL *)url
                               options:(DrantWebImageOptions)options
                              progress:(nullable DrantWebImageDownloaderProgressBlock)progressBlock
-                            completed:(nullable HHExternalCompletionBlock)completedBlock;
+                            completed:(nullable DrantExternalCompletionBlock)completedBlock;
 
 @end
 

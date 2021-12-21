@@ -12,7 +12,7 @@
 
 #import <Cocoa/Cocoa.h>
 
-@interface NSImage (hhWebCache)
+@interface NSImage (drantWebCache)
 
 - (CGImageRef)CGImage;
 - (NSArray<NSImage *> *)images;

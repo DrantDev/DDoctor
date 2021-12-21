@@ -26,9 +26,9 @@ FOUNDATION_EXPORT NSString * _Nonnull const DrantWebImageExternalCustomManagerKe
  */
 FOUNDATION_EXPORT const int64_t DrantWebImageProgressUnitCountUnknown; /* 1LL */
 
-typedef void(^HHSetImageBlock)(UIImage * _Nullable image, NSData * _Nullable imageData);
+typedef void(^DrantSetImageBlock)(UIImage * _Nullable image, NSData * _Nullable imageData);
 
-@interface UIView (hhWebCache)
+@interface UIView (drantWebCache)
 
 /**
  * Get the current image URL.
@@ -68,9 +68,9 @@ typedef void(^HHSetImageBlock)(UIImage * _Nullable image, NSData * _Nullable ima
                   placeholderImage:(nullable UIImage *)placeholder
                            options:(DrantWebImageOptions)options
                       operationKey:(nullable NSString *)operationKey
-                     setImageBlock:(nullable HHSetImageBlock)setImageBlock
+                     setImageBlock:(nullable DrantSetImageBlock)setImageBlock
                           progress:(nullable DrantWebImageDownloaderProgressBlock)progressBlock
-                         completed:(nullable HHExternalCompletionBlock)completedBlock;
+                         completed:(nullable DrantExternalCompletionBlock)completedBlock;
 
 /**
  * Set the imageView `image` with an `url` and optionally a placeholder image.
@@ -95,9 +95,9 @@ typedef void(^HHSetImageBlock)(UIImage * _Nullable image, NSData * _Nullable ima
                   placeholderImage:(nullable UIImage *)placeholder
                            options:(DrantWebImageOptions)options
                       operationKey:(nullable NSString *)operationKey
-                     setImageBlock:(nullable HHSetImageBlock)setImageBlock
+                     setImageBlock:(nullable DrantSetImageBlock)setImageBlock
                           progress:(nullable DrantWebImageDownloaderProgressBlock)progressBlock
-                         completed:(nullable HHExternalCompletionBlock)completedBlock
+                         completed:(nullable DrantExternalCompletionBlock)completedBlock
                            context:(nullable NSDictionary<NSString *, id> *)context;
 
 /**

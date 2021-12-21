@@ -86,7 +86,7 @@
  */
 - (void)d_setImageWithURL:(nullable NSURL *)url
                   forState:(UIControlState)state
-                 completed:(nullable HHExternalCompletionBlock)completedBlock;
+                 completed:(nullable DrantExternalCompletionBlock)completedBlock;
 
 /**
  * Set the imageView `image` with an `url`, placeholder.
@@ -105,7 +105,7 @@
 - (void)d_setImageWithURL:(nullable NSURL *)url
                   forState:(UIControlState)state
           placeholderImage:(nullable UIImage *)placeholder
-                 completed:(nullable HHExternalCompletionBlock)completedBlock NS_REFINED_FOR_SWIFT;
+                 completed:(nullable DrantExternalCompletionBlock)completedBlock NS_REFINED_FOR_SWIFT;
 
 /**
  * Set the imageView `image` with an `url`, placeholder and custom options.
@@ -126,7 +126,7 @@
                   forState:(UIControlState)state
           placeholderImage:(nullable UIImage *)placeholder
                    options:(DrantWebImageOptions)options
-                 completed:(nullable HHExternalCompletionBlock)completedBlock;
+                 completed:(nullable DrantExternalCompletionBlock)completedBlock;
 
 #pragma mark - Background Image
 
@@ -197,7 +197,7 @@
  */
 - (void)d_setBackgroundImageWithURL:(nullable NSURL *)url
                             forState:(UIControlState)state
-                           completed:(nullable HHExternalCompletionBlock)completedBlock;
+                           completed:(nullable DrantExternalCompletionBlock)completedBlock;
 
 /**
  * Set the backgroundImageView `image` with an `url`, placeholder.
@@ -216,7 +216,7 @@
 - (void)d_setBackgroundImageWithURL:(nullable NSURL *)url
                             forState:(UIControlState)state
                     placeholderImage:(nullable UIImage *)placeholder
-                           completed:(nullable HHExternalCompletionBlock)completedBlock NS_REFINED_FOR_SWIFT;
+                           completed:(nullable DrantExternalCompletionBlock)completedBlock NS_REFINED_FOR_SWIFT;
 
 /**
  * Set the backgroundImageView `image` with an `url`, placeholder and custom options.
@@ -236,7 +236,7 @@
                             forState:(UIControlState)state
                     placeholderImage:(nullable UIImage *)placeholder
                              options:(DrantWebImageOptions)options
-                           completed:(nullable HHExternalCompletionBlock)completedBlock;
+                           completed:(nullable DrantExternalCompletionBlock)completedBlock;
 
 #pragma mark - Cancel
 

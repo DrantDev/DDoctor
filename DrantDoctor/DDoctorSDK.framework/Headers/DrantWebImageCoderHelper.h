@@ -32,7 +32,7 @@
  */
 + (NSArray<DrantWebImageFrame *> * _Nullable)framesFromAnimatedImage:(UIImage * _Nullable)animatedImage;
 
-#if DRANT_UIKIT || HH_WATCH
+#if DRANT_UIKIT || DRANT_WATCH
 /**
  Convert an EXIF image orientation to an iOS one.
 

@@ -81,10 +81,10 @@ typedef void(^DrantWebImageDownloaderProgressBlock)(NSInteger receivedSize, NSIn
 
 typedef void(^DrantWebImageDownloaderCompletedBlock)(UIImage * _Nullable image, NSData * _Nullable data, NSError * _Nullable error, BOOL finished);
 
-typedef NSDictionary<NSString *, NSString *> HHHTTPHeadersDictionary;
-typedef NSMutableDictionary<NSString *, NSString *> HHHTTPHeadersMutableDictionary;
+typedef NSDictionary<NSString *, NSString *> DrantHTTPHeadersDictionary;
+typedef NSMutableDictionary<NSString *, NSString *> DrantHTTPHeadersMutableDictionary;
 
-typedef HHHTTPHeadersDictionary * _Nullable (^DrantWebImageDownloaderHeadersFilterBlock)(NSURL * _Nullable url, HHHTTPHeadersDictionary * _Nullable headers);
+typedef DrantHTTPHeadersDictionary * _Nullable (^DrantWebImageDownloaderHeadersFilterBlock)(NSURL * _Nullable url, DrantHTTPHeadersDictionary * _Nullable headers);
 
 /**
  *  A token associated with each download. Can be used to cancel a download

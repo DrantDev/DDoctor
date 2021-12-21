@@ -1112,11 +1112,8 @@ public typealias DrantLoginHandler = ((Swift.String?) -> Swift.Void)
   @objc public static let `default`: DDoctorSDK.DrantSDK
   @objc public func start(option: DDoctorSDK.DrantSDKOptions)
   @objc public func login(userToken: Swift.String, completion: @escaping DDoctorSDK.DrantLoginHandler)
-  @available(*, deprecated, message: "Use login(userToken: String, completion: @escaping DrantLoginHandler) instead.")
-  @objc public func login(uuid: Swift.Int, completion: @escaping DDoctorSDK.DrantLoginHandler)
   @objc public func logout(complete: ((Swift.String?) -> Swift.Void)? = nil)
   @objc public func switchEnv(_ development: Swift.Bool)
-  @objc public func startCall(_ type: DDoctorSDK.DrantCallType)
   @objc public func updateAPNS(token: Foundation.Data)
   @objc public var SDKVersion: Swift.String {
     @objc get
@@ -1134,19 +1131,10 @@ public typealias DrantLoginHandler = ((Swift.String?) -> Swift.Void)
   @objc deinit
 }
 extension DrantSDK {
-  @available(*, deprecated, message: "Use call(userToken : String) instead.")
-  @objc dynamic public func startNewCall(_ uuid: Swift.Int)
-}
-extension DrantSDK {
   @objc dynamic public func call(userToken: Swift.String)
 }
 extension DrantSDK {
   @objc dynamic public func startTeamCall(_ type: DDoctorSDK.DrantCallType, callee: DDoctorSDK.DrantCallerInfo)
-}
-extension DrantSDK {
-  @objc dynamic public func getMedicDetail(userToken: Swift.String, medicId: Swift.String) -> Swift.String
-  @objc dynamic public func getMedicList(userToken: Swift.String) -> Swift.String
-  @objc dynamic public func getAllMedics(userToken: Swift.String) -> Swift.String
 }
 @objc public enum DrantLoginCode : Swift.Int {
   case OK = 0
@@ -1187,8 +1175,6 @@ public var DrantHudManager: DDoctorSDK.DrantHUDable {
   @objc public var changeDoctorTime: Swift.Int
   public var logCallback: ((Swift.String) -> Swift.Void)?
   @objc public var mVideoOptions: DDoctorSDK.VideoOptions
-  @objc public var mMessageOptions: DDoctorSDK.MessageOptions
-  @objc public var mUserCenterOptions: DDoctorSDK.UsercenterOptions
   final public let sdkVersion: Swift.String
   final public let appVersion: Swift.String
   @objc public init(productId: Swift.String, isDebug: Swift.Bool = true, isDevelop: Swift.Bool = true)
@@ -1207,26 +1193,6 @@ public var DrantHudManager: DDoctorSDK.DrantHUDable {
   @objc public var isShowDocInfo: Swift.Bool
   @objc public var enableCloseCamera: Swift.Bool
   @objc public var isCloseCameraCall: Swift.Bool
-  @objc override dynamic public init()
-  @objc deinit
-}
-@_inheritsConvenienceInitializers @objc public class MessageOptions : ObjectiveC.NSObject {
-  @objc public var isByPresent: Swift.Bool
-  @objc public var isFilterSummary: Swift.Bool
-  @objc public var isFilterMedicinal: Swift.Bool
-  @objc public var defaultDocHeader: Swift.String
-  @objc public var defaultDocName: Swift.String
-  @objc public var messageTitle: Swift.String
-  @objc override dynamic public init()
-  @objc deinit
-}
-@_inheritsConvenienceInitializers @objc public class UsercenterOptions : ObjectiveC.NSObject {
-  @objc public var enableVipInfo: Swift.Bool
-  @objc public var hideUserCenter: Swift.Bool
-  @objc public var enableActivate: Swift.Bool
-  @objc public var enableMedical: Swift.Bool
-  @objc public var enableAddMemberInDoc: Swift.Bool
-  @objc public var enableBuyService: Swift.Bool
   @objc override dynamic public init()
   @objc deinit
 }
@@ -1528,9 +1494,7 @@ public enum DrantRequestMethod {
   }
 }
 public enum DrantServerType {
-  case pay
   case pacs
-  case weixin
   case uploadLog
   public static func == (a: DDoctorSDK.DrantServerType, b: DDoctorSDK.DrantServerType) -> Swift.Bool
   public func hash(into hasher: inout Swift.Hasher)
@@ -2462,6 +2426,9 @@ extension MD5 : DDoctorSDK.Updatable {
   final public func update(withBytes bytes: Swift.ArraySlice<Swift.UInt8>, isLast: Swift.Bool = false) throws -> Swift.Array<Swift.UInt8>
 }
 public protocol SDKRequest : DDoctorSDK.DrantRequestConfig {
+}
+extension SDKRequest {
+  public func extensionUrlHost() -> Swift.String?
 }
 final public class OCB : DDoctorSDK.BlockMode {
   public enum Mode {

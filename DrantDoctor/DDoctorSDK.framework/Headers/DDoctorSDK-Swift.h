@@ -440,22 +440,12 @@ SWIFT_CLASS_PROPERTY(@property (nonatomic, class, readonly, strong, getter=defau
 /// \param completion 完成的回调
 ///
 - (void)loginWithUserToken:(NSString * _Nonnull)userToken completion:(void (^ _Nonnull)(NSString * _Nullable))completion;
-/// 登录账号
-/// \param uuid 用户的 唯一标志符
-///
-/// \param completion 完成回调
-///
-- (void)loginWithUuid:(NSInteger)uuid completion:(void (^ _Nonnull)(NSString * _Nullable))completion SWIFT_DEPRECATED_MSG("Use login(userToken: String, completion: @escaping DrantLoginHandler) instead.");
 /// 退出登录
 /// \param complet 登录状态回调， 如果为nil表示退出d成功
 ///
 - (void)logoutWithComplete:(void (^ _Nullable)(NSString * _Nullable))complete;
 /// 切换正式/测试环境，请勿调用
 - (void)switchEnv:(BOOL)development;
-/// 主叫发起通话
-/// \param type 呼叫类型
-///
-- (void)startCall:(enum DrantCallType)type;
 /// 更新APNS Token
 /// \param token APNS Token
 ///
@@ -478,33 +468,6 @@ SWIFT_CLASS_PROPERTY(@property (nonatomic, class, readonly, strong, getter=defau
 
 
 @interface DrantSDK (SWIFT_EXTENSION(DDoctorSDK))
-/// 获取病历详情
-/// \param userToken 当前人的唯一标志
-///
-/// \param medicId 病历id
-///
-///
-/// returns:
-/// url
-- (NSString * _Nonnull)getMedicDetailWithUserToken:(NSString * _Nonnull)userToken medicId:(NSString * _Nonnull)medicId SWIFT_WARN_UNUSED_RESULT;
-/// 获取病历列表
-/// \param userToken 当前人的唯一标志
-///
-///
-/// returns:
-/// url
-- (NSString * _Nonnull)getMedicListWithUserToken:(NSString * _Nonnull)userToken SWIFT_WARN_UNUSED_RESULT;
-/// 获取所有病历列表
-/// \param userToken 主账户的唯一标志
-///
-///
-/// returns:
-/// url
-- (NSString * _Nonnull)getAllMedicsWithUserToken:(NSString * _Nonnull)userToken SWIFT_WARN_UNUSED_RESULT;
-@end
-
-
-@interface DrantSDK (SWIFT_EXTENSION(DDoctorSDK))
 /// 主动发起多人通话
 /// \param type 呼叫类型
 ///
@@ -512,7 +475,6 @@ SWIFT_CLASS_PROPERTY(@property (nonatomic, class, readonly, strong, getter=defau
 ///
 - (void)startTeamCall:(enum DrantCallType)type callee:(DrantCallerInfo * _Nonnull)callee;
 @end
-
 
 
 @interface DrantSDK (SWIFT_EXTENSION(DDoctorSDK))
@@ -526,16 +488,8 @@ SWIFT_CLASS_PROPERTY(@property (nonatomic, class, readonly, strong, getter=defau
 @end
 
 
-@interface DrantSDK (SWIFT_EXTENSION(DDoctorSDK))
-/// 发起呼叫
-/// \param uuid 呼叫人uuid
-///
-- (void)startNewCall:(NSInteger)uuid SWIFT_DEPRECATED_MSG("Use call(userToken : String) instead.");
-@end
 
 @class VideoOptions;
-@class MessageOptions;
-@class UsercenterOptions;
 
 /// 全局配置
 SWIFT_CLASS("_TtC10DDoctorSDK15DrantSDKOptions")
@@ -556,10 +510,6 @@ SWIFT_CLASS_PROPERTY(@property (nonatomic, class, readonly, strong, getter=defau
 @property (nonatomic) NSInteger changeDoctorTime;
 /// 音视频配置
 @property (nonatomic, strong) VideoOptions * _Nonnull mVideoOptions;
-/// 信息流配置
-@property (nonatomic, strong) MessageOptions * _Nonnull mMessageOptions;
-/// 个人中心配置
-@property (nonatomic, strong) UsercenterOptions * _Nonnull mUserCenterOptions;
 - (nonnull instancetype)initWithProductId:(NSString * _Nonnull)productId isDebug:(BOOL)isDebug isDevelop:(BOOL)isDevelop OBJC_DESIGNATED_INITIALIZER;
 - (void)setUserExtensionWithUserExtension:(NSString * _Nonnull)userExtension;
 - (void)setCallExtensionWithCallExtension:(NSString * _Nonnull)callExtension;
@@ -653,24 +603,6 @@ SWIFT_PROTOCOL("_TtP10DDoctorSDK23FloatRatingViewDelegate_")
 @end
 
 
-SWIFT_CLASS("_TtC10DDoctorSDK14MessageOptions")
-@interface MessageOptions : NSObject
-/// 是否是Present显示
-@property (nonatomic) BOOL isByPresent;
-/// 信息流是否过滤医生总结
-@property (nonatomic) BOOL isFilterSummary;
-/// 信息流是否过滤药卡
-@property (nonatomic) BOOL isFilterMedicinal;
-/// 信息流默认头像
-@property (nonatomic, copy) NSString * _Nonnull defaultDocHeader;
-/// 信息流默认昵称
-@property (nonatomic, copy) NSString * _Nonnull defaultDocName;
-/// 信息流默认标题
-@property (nonatomic, copy) NSString * _Nonnull messageTitle;
-- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
-@end
-
-
 
 
 
@@ -704,17 +636,17 @@ SWIFT_CLASS("_TtC10DDoctorSDK11TRTCManager")
 
 
 
-@interface TRTCManager (SWIFT_EXTENSION(DDoctorSDK)) <TIMConnListener>
-- (void)onConnSucc;
-- (void)onConnFailed:(int32_t)code err:(NSString * _Null_unspecified)err;
-- (void)onDisconnect:(int32_t)code err:(NSString * _Null_unspecified)err;
-@end
-
-
 @interface TRTCManager (SWIFT_EXTENSION(DDoctorSDK)) <TIMUserStatusListener>
 - (void)onForceOffline;
 - (void)onReConnFailed:(int32_t)code err:(NSString * _Null_unspecified)err;
 - (void)onUserSigExpired;
+@end
+
+
+@interface TRTCManager (SWIFT_EXTENSION(DDoctorSDK)) <TIMConnListener>
+- (void)onConnSucc;
+- (void)onConnFailed:(int32_t)code err:(NSString * _Null_unspecified)err;
+- (void)onDisconnect:(int32_t)code err:(NSString * _Null_unspecified)err;
 @end
 
 
@@ -771,24 +703,6 @@ SWIFT_CLASS("_TtC10DDoctorSDK11TRTCManager")
 
 
 
-
-
-SWIFT_CLASS("_TtC10DDoctorSDK17UsercenterOptions")
-@interface UsercenterOptions : NSObject
-/// 是否隐藏会员信息
-@property (nonatomic) BOOL enableVipInfo;
-/// 是否隐藏个人中心入口
-@property (nonatomic) BOOL hideUserCenter;
-/// 是否展示激活码入口
-@property (nonatomic) BOOL enableActivate;
-/// 是否展示档案库入口
-@property (nonatomic) BOOL enableMedical;
-/// 档案库是否可以增加成员
-@property (nonatomic) BOOL enableAddMemberInDoc;
-/// 是否显示购买VIP入口
-@property (nonatomic) BOOL enableBuyService;
-- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
-@end
 
 
 SWIFT_CLASS("_TtC10DDoctorSDK12VideoOptions")

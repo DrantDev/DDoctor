@@ -36,7 +36,7 @@ typedef NS_OPTIONS(NSUInteger, DrantImageCacheOptions) {
     DrantImageCacheQueryDiskSync = 1 << 1
 };
 
-typedef void(^HHCacheQueryCompletedBlock)(UIImage * _Nullable image, NSData * _Nullable data, DrantImageCacheType cacheType);
+typedef void(^DrantCacheQueryCompletedBlock)(UIImage * _Nullable image, NSData * _Nullable data, DrantImageCacheType cacheType);
 
 typedef void(^DrantWebImageCheckCacheCompletionBlock)(BOOL isInCache);
 
@@ -182,7 +182,7 @@ typedef void(^DrantWebImageCalculateSizeBlock)(NSUInteger fileCount, NSUInteger 
  *
  * @return a NSOperation instance containing the cache op
  */
-- (nullable NSOperation *)queryCacheOperationForKey:(nullable NSString *)key done:(nullable HHCacheQueryCompletedBlock)doneBlock;
+- (nullable NSOperation *)queryCacheOperationForKey:(nullable NSString *)key done:(nullable DrantCacheQueryCompletedBlock)doneBlock;
 
 /**
  * Operation that queries the cache asynchronously and call the completion when done.
@@ -193,7 +193,7 @@ typedef void(^DrantWebImageCalculateSizeBlock)(NSUInteger fileCount, NSUInteger 
  *
  * @return a NSOperation instance containing the cache op
  */
-- (nullable NSOperation *)queryCacheOperationForKey:(nullable NSString *)key options:(DrantImageCacheOptions)options done:(nullable HHCacheQueryCompletedBlock)doneBlock;
+- (nullable NSOperation *)queryCacheOperationForKey:(nullable NSString *)key options:(DrantImageCacheOptions)options done:(nullable DrantCacheQueryCompletedBlock)doneBlock;
 
 /**
  * Query the memory cache synchronously.

@@ -31,21 +31,21 @@
 #endif
 
 #if TARGET_OS_IOS
-    #define HH_IOS 1
+    #define DRANT_IOS 1
 #else
-    #define HH_IOS 0
+    #define DRANT_IOS 0
 #endif
 
 #if TARGET_OS_TV
-    #define HH_TV 1
+    #define DRANT_TV 1
 #else
-    #define HH_TV 0
+    #define DRANT_TV 0
 #endif
 
 #if TARGET_OS_WATCH
-    #define HH_WATCH 1
+    #define DRANT_WATCH 1
 #else
-    #define HH_WATCH 0
+    #define DRANT_WATCH 0
 #endif
 
 
@@ -68,7 +68,7 @@
     #if DRANT_UIKIT
         #import <UIKit/UIKit.h>
     #endif
-    #if HH_WATCH
+    #if DRANT_WATCH
         #import <WatchKit/WatchKit.h>
     #endif
 #endif
@@ -81,7 +81,7 @@
 #define NS_OPTIONS(_type, _name) enum _name : _type _name; enum _name : _type
 #endif
 
-FOUNDATION_EXPORT UIImage *HHScaledImageForKey(NSString *key, UIImage *image);
+FOUNDATION_EXPORT UIImage *DrantScaledImageForKey(NSString *key, UIImage *image);
 
 typedef void(^DrantWebImageNoParamsBlock)(void);
 

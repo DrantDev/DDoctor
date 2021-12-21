@@ -3,7 +3,7 @@
 //  CameraLibrary
 //
 //  Created by shmily on 16/3/16.
-//  Copyright © 2016年 HHPacs. All rights reserved.
+//  Copyright © 2016年 DrantPacs. All rights reserved.
 //
 
 #import <UIKit/UIKit.h>

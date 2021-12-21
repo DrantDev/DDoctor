@@ -118,7 +118,7 @@ typedef NS_OPTIONS(NSUInteger, DrantWebImageOptions) {
     DrantWebImageForceTransition = 1 << 16
 };
 
-typedef void(^HHExternalCompletionBlock)(UIImage * _Nullable image, NSError * _Nullable error, DrantImageCacheType cacheType, NSURL * _Nullable imageURL);
+typedef void(^DrantExternalCompletionBlock)(UIImage * _Nullable image, NSError * _Nullable error, DrantImageCacheType cacheType, NSURL * _Nullable imageURL);
 
 typedef void(^HHInternalCompletionBlock)(UIImage * _Nullable image, NSData * _Nullable data, NSError * _Nullable error, DrantImageCacheType cacheType, BOOL finished, NSURL * _Nullable imageURL);
 
@@ -169,7 +169,7 @@ typedef NSData * _Nullable(^DrantWebImageCacheSerializerBlock)(UIImage * _Nonnul
 
 /**
  * The DrantWebImageManager is the class behind the UIImageView+WebCache category and likes.
- * It ties the asynchronous downloader (DrantWebImageDownloader) with the image cache store (HHImageCache).
+ * It ties the asynchronous downloader (DrantWebImageDownloader) with the image cache store (DrantImageCache).
  * You can use this class directly to benefit from web image downloading with caching in another context than
  * a UIView.
  *
@@ -181,7 +181,7 @@ DrantWebImageManager *manager = [DrantWebImageManager sharedManager];
 [manager loadImageWithURL:imageURL
                   options:0
                  progress:nil
-                completed:^(UIImage *image, NSError *error, HHImageCacheType cacheType, BOOL finished, NSURL *imageURL) {
+                completed:^(UIImage *image, NSError *error, DrantImageCacheType cacheType, BOOL finished, NSURL *imageURL) {
                     if (image) {
                         // do something with image
                     }
@@ -215,15 +215,15 @@ DrantWebImageManager.sharedManager.cacheKeyFilter = ^(NSURL * _Nullable url) {
 @property (nonatomic, copy, nullable) DrantWebImageCacheKeyFilterBlock cacheKeyFilter;
 
 /**
- * The cache serializer is a block used to convert the decoded image, the source downloaded data, to the actual data used for storing to the disk cache. If you return nil, means to generate the data from the image instance, see `HHImageCache`.
+ * The cache serializer is a block used to convert the decoded image, the source downloaded data, to the actual data used for storing to the disk cache. If you return nil, means to generate the data from the image instance, see `DrantImageCache`.
  * For example, if you are using WebP images and facing the slow decoding time issue when later retriving from disk cache again. You can try to encode the decoded image to JPEG/PNG format to disk cache instead of source downloaded data.
  * @note The `image` arg is nonnull, but when you also provide a image transformer and the image is transformed, the `data` arg may be nil, take attention to this case.
  * @note This method is called from a global queue in order to not to block the main thread.
  * @code
  DrantWebImageManager.sharedManager.cacheKeyFilter = ^NHHata * _Nullable(UIImage * _Nonnull image, NSData * _Nullable data, NSURL * _Nullable imageURL) {
-    HHImageFormat format = [NSData sd_imageFormatForImageData:data];
+    DrantImageFormat format = [NSData sd_imageFormatForImageData:data];
     switch (format) {
-        case HHImageFormatWebP:
+        case DrantImageFormatWebP:
             return image.images ? data : nil;
         default:
             return data;
