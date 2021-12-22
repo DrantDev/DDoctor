@@ -10,7 +10,7 @@
 #import <UIKit/UIKit.h>
 
 // 图片是否压缩临界点
-#define HHImgReduceSize 1000000
+#define DrantImgReduceSize 1000000
 
 @class AVAssetExportSession;
 

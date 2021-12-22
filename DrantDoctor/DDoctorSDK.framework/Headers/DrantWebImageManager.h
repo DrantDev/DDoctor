@@ -120,7 +120,7 @@ typedef NS_OPTIONS(NSUInteger, DrantWebImageOptions) {
 
 typedef void(^DrantExternalCompletionBlock)(UIImage * _Nullable image, NSError * _Nullable error, DrantImageCacheType cacheType, NSURL * _Nullable imageURL);
 
-typedef void(^HHInternalCompletionBlock)(UIImage * _Nullable image, NSData * _Nullable data, NSError * _Nullable error, DrantImageCacheType cacheType, BOOL finished, NSURL * _Nullable imageURL);
+typedef void(^DrantInternalCompletionBlock)(UIImage * _Nullable image, NSData * _Nullable data, NSError * _Nullable error, DrantImageCacheType cacheType, BOOL finished, NSURL * _Nullable imageURL);
 
 typedef NSString * _Nullable(^DrantWebImageCacheKeyFilterBlock)(NSURL * _Nullable url);
 
@@ -275,7 +275,7 @@ DrantWebImageManager.sharedManager.cacheKeyFilter = ^(NSURL * _Nullable url) {
 - (nullable id <DrantWebImageOperation>)loadImageWithURL:(nullable NSURL *)url
                                               options:(DrantWebImageOptions)options
                                              progress:(nullable DrantWebImageDownloaderProgressBlock)progressBlock
-                                            completed:(nullable HHInternalCompletionBlock)completedBlock;
+                                            completed:(nullable DrantInternalCompletionBlock)completedBlock;
 
 /**
  * Saves image to cache for given URL
