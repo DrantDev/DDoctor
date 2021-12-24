@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'DrantDoctor'
-  s.version= "3.1.8.12231432"
+  s.version= "3.1.8.12241040"
 
   s.summary          = 'A short description of DrantDoctor.'
 
